@@ -133,10 +133,11 @@ export const Footer = () => {
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/faq" className="hidden hover:text-white hover:translate-x-1 transition-all inline-block">
-                                    Preguntas Frecuentes
+                                <Link href="/centro-de-ayuda" className="hover:text-white hover:translate-x-1 transition-all inline-block">
+                                    Centro de Ayuda
                                 </Link>
                             </li>
+
                         </ul>
                     </div>
                 </div>
