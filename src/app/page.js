@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { client } from "@/lib/appwrite";
 import { Databases, Query } from "appwrite";
 import { MapPin, ArrowRight, Search, MessageCircle, ChevronLeft, ChevronRight, Sun, Moon, ChevronDown, ChevronUp } from "lucide-react";
@@ -12,7 +12,7 @@ import { useTheme } from "@/context/ThemeContext";
 
 const MOCK_RESIDENTIALS = [];
 
-export default function LandingPage() {
+function LandingPageContent() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const searchParams = useSearchParams(); // Get search params
@@ -361,5 +361,13 @@ export default function LandingPage() {
         residential={selectedResidential}
       />
     </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center">Cargando...</div>}>
+      <LandingPageContent />
+    </Suspense>
   );
 }
