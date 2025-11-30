@@ -11,11 +11,20 @@
   "dependencies": {
     "@appwrite.io/pink-icons": "^1.0.0",
     "@tailwindcss/postcss": "^4.0.14",
+    "@tailwindcss/typography": "^0.5.19",
     "appwrite": "^16.1.0",
+    "dotenv": "^17.2.3",
+    "framer-motion": "^12.23.24",
+    "gray-matter": "^4.0.3",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.555.0",
     "next": "14.2.15",
+    "node-appwrite": "^20.3.0",
     "postcss": "^8.5.3",
     "react": "^18",
     "react-dom": "^18",
+    "react-leaflet": "^4.2.1",
+    "react-markdown": "^10.1.0",
     "tailwindcss": "^4.0.14"
   },
   "devDependencies": {

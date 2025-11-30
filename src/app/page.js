@@ -1,311 +1,365 @@
 "use client";
 
-import "./app.css";
-import "@appwrite.io/pink-icons";
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { client } from "@/lib/appwrite";
-import { AppwriteException } from "appwrite";
-import NextjsLogo from "../static/nextjs-icon.svg";
-import AppwriteLogo from "../static/appwrite-icon.svg";
-import Image from "next/image";
+import { Databases, Query } from "appwrite";
+import { MapPin, ArrowRight, Search, MessageCircle, ChevronLeft, ChevronRight, Sun, Moon, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { AccessModal } from "@/components/access/AccessModal";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Footer } from "@/components/layout/Footer";
+import { useTheme } from "@/context/ThemeContext";
 
-export default function Home() {
-  const [detailHeight, setDetailHeight] = useState(55);
-  const [logs, setLogs] = useState([]);
-  const [status, setStatus] = useState("idle");
-  const [showLogs, setShowLogs] = useState(false);
+const MOCK_RESIDENTIALS = [];
 
-  const detailsRef = useRef(null);
+export default function LandingPage() {
+  const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
+  const searchParams = useSearchParams(); // Get search params
+  const [residentials, setResidentials] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedResidential, setSelectedResidential] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("grid");
+  const [faqs, setFaqs] = useState([]);
+  const [openFaqIndex, setOpenFaqIndex] = useState(null);
+  const [globalConfig, setGlobalConfig] = useState({ whatsapp_asistencia: "5215555555555" });
 
-  const updateHeight = useCallback(() => {
-    if (detailsRef.current) {
-      setDetailHeight(detailsRef.current.clientHeight);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
+
+  // Sync viewMode with URL params
+  useEffect(() => {
+    const view = searchParams.get("view");
+    console.log("URL View Param:", view);
+    if (view === "list" || view === "grid") {
+      console.log("Setting viewMode to:", view);
+      setViewMode(view);
     }
-  }, [logs, showLogs]);
+  }, [searchParams]);
+
+  console.log("Current viewMode:", viewMode);
 
   useEffect(() => {
-    updateHeight();
-    window.addEventListener("resize", updateHeight);
-    return () => window.removeEventListener("resize", updateHeight);
-  }, [updateHeight]);
+    const fetchResidentials = async () => {
+      try {
+        setLoading(true);
+        const databases = new Databases(client);
+        const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 
-  useEffect(() => {
-    if (!detailsRef.current) return;
-    detailsRef.current.addEventListener("toggle", updateHeight);
+        console.log('Fetching residentials from:', dbId);
+        const response = await databases.listDocuments(
+          dbId,
+          "residenciales",
+          []
+        );
 
-    return () => {
-      if (!detailsRef.current) return;
-      detailsRef.current.removeEventListener("toggle", updateHeight);
+        console.log('Residentials response:', response);
+        if (response.documents.length > 0) {
+          const mapped = response.documents.map(doc => ({
+            ...doc,
+            name: doc.nombre,
+            address: doc.direccion || "Ubicación Registrada",
+            image: doc.imagen_url || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80"
+          }));
+          console.log('Mapped residentials:', mapped);
+          setResidentials(mapped);
+        } else {
+          console.log('No residentials found');
+        }
+      } catch (error) {
+        console.error("Error fetching residentials:", error);
+        setResidentials(MOCK_RESIDENTIALS);
+      } finally {
+        setLoading(false);
+      }
     };
+
+    const fetchContentAndConfig = async () => {
+      try {
+        const databases = new Databases(client);
+        const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+
+        // Fetch Config
+        const configRes = await databases.listDocuments(dbId, "configuracion_global", [Query.limit(1)]);
+        if (configRes.documents.length > 0) {
+          setGlobalConfig(configRes.documents[0]);
+        }
+
+        // Fetch FAQs
+        const faqsRes = await databases.listDocuments(dbId, "contenidos", [
+          Query.equal("tipo_contenido", "faqs"),
+          Query.limit(5)
+        ]);
+        setFaqs(faqsRes.documents);
+
+      } catch (error) {
+        console.error("Error fetching content:", error);
+      }
+    };
+
+    fetchResidentials();
+    fetchContentAndConfig();
   }, []);
 
-  async function sendPing() {
-    if (status === "loading") return;
-    setStatus("loading");
-    try {
-      const result = await client.ping();
-      const log = {
-        date: new Date(),
-        method: "GET",
-        path: "/v1/ping",
-        status: 200,
-        response: JSON.stringify(result),
-      };
-      setLogs((prevLogs) => [log, ...prevLogs]);
-      setStatus("success");
-    } catch (err) {
-      const log = {
-        date: new Date(),
-        method: "GET",
-        path: "/v1/ping",
-        status: err instanceof AppwriteException ? err.code : 500,
-        response:
-          err instanceof AppwriteException
-            ? err.message
-            : "Something went wrong",
-      };
-      setLogs((prevLogs) => [log, ...prevLogs]);
-      setStatus("error");
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredResidentials = residentials.filter(res =>
+    res.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    res.address.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Pagination Logic
+  const showSearchAndPagination = residentials.length > 10;
+  const totalPages = Math.ceil(filteredResidentials.length / ITEMS_PER_PAGE);
+
+  const displayedResidentials = showSearchAndPagination
+    ? filteredResidentials.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+    : filteredResidentials;
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      document.getElementById('residential-grid')?.scrollIntoView({ behavior: 'smooth' });
     }
-    setShowLogs(true);
-  }
+  };
+
+  const handleResidentialClick = (res) => {
+    const grantedAccess = JSON.parse(localStorage.getItem("granted_access") || "[]");
+    if (grantedAccess.includes(res.slug)) {
+      router.push(`/${res.slug}`);
+      return;
+    }
+
+    setSelectedResidential(res);
+    setIsModalOpen(true);
+  };
 
   return (
-    <main
-      className="checker-background flex flex-col items-center p-5"
-      style={{ marginBottom: `${detailHeight}px` }}
-    >
-      <div className="mt-25 flex w-full max-w-[40em] items-center justify-center lg:mt-34">
-        <div className="rounded-[25%] border border-[#19191C0A] bg-[#F9F9FA] p-3 shadow-[0px_9.36px_9.36px_0px_hsla(0,0%,0%,0.04)]">
-          <div className="rounded-[25%] border border-[#FAFAFB] bg-white p-5 shadow-[0px_2px_12px_0px_hsla(0,0%,0%,0.03)] lg:p-9">
-            <Image
-              alt={"Next.js logo"}
-              src={NextjsLogo}
-              width={56}
-              height={56}
-            />
-          </div>
-        </div>
-        <div
-          className={`flex w-38 items-center transition-opacity duration-2500 ${status === "success" ? "opacity-100" : "opacity-0"}`}
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Hero Section */}
+      <div className="bg-primary text-white px-6 py-12 md:py-20 text-center relative overflow-hidden">
+        {/* Decorative Background Elements */}
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-20"
+          aria-label="Toggle theme"
         >
-          <div className="to-[rgba(253, 54, 110, 0.15)] h-[1px] flex-1 bg-gradient-to-l from-[#f02e65]"></div>
-          <div className="icon-check flex h-5 w-5 items-center justify-center rounded-full border border-[#FD366E52] bg-[#FD366E14] text-[#FD366E]"></div>
-          <div className="to-[rgba(253, 54, 110, 0.15)] h-[1px] flex-1 bg-gradient-to-r from-[#f02e65]"></div>
-        </div>
-        <div className="rounded-[25%] border border-[#19191C0A] bg-[#F9F9FA] p-3 shadow-[0px_9.36px_9.36px_0px_hsla(0,0%,0%,0.04)]">
-          <div className="rounded-[25%] border border-[#FAFAFB] bg-white p-5 shadow-[0px_2px_12px_0px_hsla(0,0%,0%,0.03)] lg:p-9">
-            <Image
-              alt={"Appwrite logo"}
-              src={AppwriteLogo}
-              width={56}
-              height={56}
+          {theme === 'dark' ? <Sun size={24} /> : <Moon size={24} />}
+        </button>
+
+        <div className="relative z-10 flex flex-col items-center">
+          {/* Large Centered Logo */}
+          <div className="w-20 h-20 md:w-28 md:h-28 bg-white rounded-full shadow-2xl flex items-center justify-center mb-6 p-3 transform hover:scale-105 transition-transform duration-500">
+            <img
+              src="/vecivendo_logo_primary.png"
+              alt="Vecivendo Logo"
+              className="w-full h-full object-contain rounded-full"
             />
           </div>
+
+          <h1 className="text-3xl md:text-5xl font-bold mb-4 font-poppins">
+            Bienvenido a Vecivendo
+          </h1>
+          <p className="text-white/90 text-lg md:text-xl max-w-2xl mx-auto mb-2">
+            El marketplace exclusivo para tu comunidad.
+          </p>
+          <p className="text-white/80 text-base md:text-lg max-w-2xl mx-auto mb-8 font-medium">
+            ✨ 100% Gratuito • Promoviendo la economia y el intercambio vecinal
+          </p>
+
+          {/* Search Bar - Conditional Rendering */}
+          {showSearchAndPagination && (
+            <div className="max-w-md w-full mx-auto relative animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar tu residencial..."
+                className="w-full pl-12 pr-4 py-3 rounded-full text-text-main bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      <section className="mt-12 flex h-52 flex-col items-center">
-        {status === "loading" ? (
-          <div className="flex flex-row gap-4">
-            <div role="status">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 animate-spin fill-[#FD366E] text-gray-200 dark:text-gray-600"
-                viewBox="0 0 100 101"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
+      {/* Residential List */}
+      <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-12">
+        <h2 className="text-2xl font-bold text-text-main mb-8" id="residential-grid">Residenciales Disponibles</h2>
+
+        {/* Loading Skeleton */}
+        {loading ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {[...Array(3)].map((_, idx) => (
+              <div
+                key={idx}
+                className="bg-surface rounded-2xl overflow-hidden shadow-sm border border-border animate-pulse"
               >
-                <path
-                  d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
-                  fill="currentColor"
-                />
-                <path
-                  d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
-                  fill="currentFill"
-                />
-              </svg>
-              <span className="sr-only">Loading...</span>
-            </div>
-            <span>Waiting for connection...</span>
+                {/* Image skeleton */}
+                <div className="h-48 bg-gray-200 dark:bg-gray-700" />
+
+                {/* Content skeleton */}
+                <div className="p-5 space-y-3">
+                  {/* Title skeleton */}
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+
+                  {/* Address skeleton */}
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+
+                  {/* Button skeleton */}
+                  <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg mt-4" />
+                </div>
+              </div>
+            ))}
           </div>
-        ) : status === "success" ? (
-          <h1 className="font-[Poppins] text-2xl font-light text-[#2D2D31]">
-            Congratulations!
-          </h1>
         ) : (
-          <h1 className="font-[Poppins] text-2xl font-light text-[#2D2D31]">
-            Check connection
-          </h1>
+          <>
+            {/* Residentials Grid/List */}
+            <div className={
+              (viewMode === "grid" && displayedResidentials.length > 1)
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
+                : "flex flex-col gap-4 mb-8"
+            }>
+              {displayedResidentials.map((res) => (
+                <div
+                  key={res.$id}
+                  onClick={() => handleResidentialClick(res)}
+                  className={`bg-surface rounded-2xl overflow-hidden shadow-sm border border-border hover:shadow-md transition-all cursor-pointer group ${(viewMode === "list" || displayedResidentials.length === 1) ? "flex flex-col md:flex-row md:h-48" : ""
+                    }`}
+                >
+                  <div className={`${(viewMode === "list" || displayedResidentials.length === 1) ? "w-full md:w-48 shrink-0 h-48 md:h-auto" : "h-48"
+                    } overflow-hidden relative`}>
+                    <img
+                      src={res.image}
+                      alt={res.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60" />
+                  </div>
+                  <div className="p-5 flex flex-col flex-1 justify-center">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-text-main mb-1">{res.name}</h3>
+                      <p className="text-sm text-text-secondary mb-4 flex items-center gap-1">
+                        <MapPin size={14} />
+                        {res.address}
+                      </p>
+                    </div>
+                    <div className={`${(viewMode === "list" || displayedResidentials.length === 1) ? "md:self-end md:w-auto w-full" : "mt-auto"}`}>
+                      <Button className="w-full justify-between border border-transparent bg-primary text-white hover:bg-white hover:text-primary hover:border-primary transition-all duration-300">
+                        Ver marketplace
+                        <ArrowRight size={18} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {showSearchAndPagination && totalPages > 1 && (
+              <div className="flex justify-center items-center gap-4 mb-16">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="rounded-full w-10 h-10 p-0"
+                >
+                  <ChevronLeft size={20} />
+                </Button>
+                <span className="text-text-secondary font-medium">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="rounded-full w-10 h-10 p-0"
+                >
+                  <ChevronRight size={20} />
+                </Button>
+              </div>
+            )}
+
+            {filteredResidentials.length === 0 && (
+              <div className="text-center py-12 text-text-secondary mb-12">
+                <p>No encontramos residenciales con ese nombre.</p>
+              </div>
+            )}
+          </>
         )}
 
-        <p className="mt-2 mb-8">
-          {status === "success" ? (
-            <span>You connected your app successfully.</span>
-          ) : status === "error" || status === "idle" ? (
-            <span>Send a ping to verify the connection</span>
-          ) : null}
-        </p>
+        {/* CTA Section */}
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 md:p-12 text-center text-white relative overflow-hidden mb-12">
+          <div className="relative z-10 max-w-2xl mx-auto">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 font-poppins text-white dark:text-white">
+              ¿Quieres que entremos a organizar el desmadre del grupo de WhatsApp de tu comunidad?
+            </h2>
+            <p className="text-gray-100 mb-8 text-lg font-medium">
+              Vecivendo es 100% gratuito. Crear la tienda de tu comunidad es fácil y toma apenas 1 minuto.
+            </p>
+            <a
+              href="https://wa.me/5215555555555"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-[#25D366] text-white font-bold py-4 px-8 rounded-full transition-all transform hover:scale-105 shadow-lg border border-transparent hover:border-white"
+            >
+              <MessageCircle className="w-6 h-6" />
+              ¡Quiero mi comunidad en Vecivendo!
+            </a>
+          </div>
 
-        <button
-          onClick={sendPing}
-          className={`cursor-pointer rounded-md bg-[#FD366E] px-2.5 py-1.5 ${status === "loading" ? "hidden" : "visible"}`}
-        >
-          <span className="text-white">Send a ping</span>
-        </button>
-      </section>
-
-      <div className="grid grid-rows-3 gap-7 lg:grid-cols-3 lg:grid-rows-none">
-        <div className="flex h-full w-72 flex-col gap-2 rounded-md border border-[#EDEDF0] bg-white p-4">
-          <h2 className="text-xl font-light text-[#2D2D31]">Edit your app</h2>
-          <p>
-            Edit{" "}
-            <code className="rounded-sm bg-[#EDEDF0] p-1">app/page.js</code> to
-            get started with building your app.
-          </p>
+          {/* Decorative elements */}
+          <div className="absolute top-0 left-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
         </div>
-        <a
-          href="https://cloud.appwrite.io"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <div className="flex h-full w-72 flex-col gap-2 rounded-md border border-[#EDEDF0] bg-white p-4">
-            <div className="flex flex-row items-center justify-between">
-              <h2 className="text-xl font-light text-[#2D2D31]">
-                Go to console
-              </h2>
-              <span className="icon-arrow-right text-[#D8D8DB]"></span>
-            </div>
-            <p>
-              Navigate to the console to control and oversee the Appwrite
-              services.
-            </p>
-          </div>
-        </a>
 
-        <a
-          href="https://appwrite.io/docs"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <div className="flex h-full w-72 flex-col gap-2 rounded-md border border-[#EDEDF0] bg-white p-4">
-            <div className="flex flex-row items-center justify-between">
-              <h2 className="text-xl font-light text-[#2D2D31]">
-                Explore docs
-              </h2>
-              <span className="icon-arrow-right text-[#D8D8DB]"></span>
+        {/* FAQ Section */}
+        {faqs.length > 0 && (
+          <div className="max-w-3xl mx-auto mb-16">
+            <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-text-main">Preguntas Frecuentes</h2>
+            <div className="space-y-4">
+              {faqs.map((faq, index) => (
+                <div key={faq.$id} className="bg-surface rounded-xl border border-border overflow-hidden">
+                  <button
+                    onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+                    className="w-full flex items-center justify-between p-4 text-left font-medium text-text-main hover:bg-background/50 transition-colors"
+                  >
+                    <span>{faq.titulo}</span>
+                    {openFaqIndex === index ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </button>
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${openFaqIndex === index ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                      }`}
+                  >
+                    <div className="p-4 pt-0 text-text-secondary text-sm leading-relaxed">
+                      {faq.contenido_largo}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <p>
-              Discover the full power of Appwrite by diving into our
-              documentation.
-            </p>
           </div>
-        </a>
+        )}
       </div>
 
-      <aside className="fixed bottom-0 flex w-full cursor-pointer border-t border-[#EDEDF0] bg-white">
-        <details open={showLogs} ref={detailsRef} className={"w-full"}>
-          <summary className="flex w-full flex-row justify-between p-4 marker:content-none">
-            <div className="flex gap-2">
-              <span className="font-semibold">Logs</span>
-              {logs.length > 0 && (
-                <div className="flex items-center rounded-md bg-[#E6E6E6] px-2">
-                  <span className="font-semibold">{logs.length}</span>
-                </div>
-              )}
-            </div>
-            <div className="icon">
-              <span className="icon-cheveron-down" aria-hidden="true"></span>
-            </div>
-          </summary>
-          <div className="flex w-full flex-col lg:flex-row">
-            <div className="flex flex-col border-r border-[#EDEDF0]">
-              <div className="border-y border-[#EDEDF0] bg-[#FAFAFB] px-4 py-2 text-[#97979B]">
-                Project
-              </div>
-              <div className="grid grid-cols-2 gap-4 p-4">
-                <div className="flex flex-col">
-                  <span className="text-[#97979B]">Endpoint</span>
-                  <span className="truncate">
-                    {process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[#97979B]">Project-ID</span>
-                  <span className="truncate">
-                    {process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[#97979B]">Project name</span>
-                  <span className="truncate">
-                    {process.env.NEXT_PUBLIC_APPWRITE_PROJECT_NAME}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex-grow">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-y border-[#EDEDF0] bg-[#FAFAFB] text-[#97979B]">
-                    {logs.length > 0 ? (
-                      <>
-                        <td className="w-52 py-2 pl-4">Date</td>
-                        <td>Status</td>
-                        <td>Method</td>
-                        <td className="hidden lg:table-cell">Path</td>
-                        <td className="hidden lg:table-cell">Response</td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="py-2 pl-4">Logs</td>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.length > 0 ? (
-                    logs.map((log) => (
-                      <tr>
-                        <td className="py-2 pl-4 font-[Fira_Code]">
-                          {log.date.toLocaleString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </td>
-                        <td>
-                          {log.status > 400 ? (
-                            <div className="w-fit rounded-sm bg-[#FF453A3D] px-1 text-[#B31212]">
-                              {log.status}
-                            </div>
-                          ) : (
-                            <div className="w-fit rounded-sm bg-[#10B9813D] px-1 text-[#0A714F]">
-                              {log.status}
-                            </div>
-                          )}
-                        </td>
-                        <td>{log.method}</td>
-                        <td className="hidden lg:table-cell">{log.path}</td>
-                        <td className="hidden font-[Fira_Code] lg:table-cell">
-                          {log.response}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="py-2 pl-4 font-[Fira_Code]">
-                        There are no logs to show
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </details>
-      </aside>
-    </main>
+      <Footer />
+
+      <AccessModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        residential={selectedResidential}
+      />
+    </div>
   );
 }

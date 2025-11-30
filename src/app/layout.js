@@ -1,25 +1,49 @@
-import AppwriteIcon from "../static/appwrite-icon.svg";
+import "./app.css";
+import { Inter, Nunito_Sans } from "next/font/google";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { ToastProvider } from "@/context/ToastContext";
+import { CartProvider } from "@/context/CartContext";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const nunitoSans = Nunito_Sans({
+  weight: ['300', '400', '600', '700', '800'],
+  subsets: ["latin"],
+  variable: "--font-nunito"
+});
 
 export const metadata = {
-  title: "Appwrite + Next.js",
-  description: "Appwrite starter for Next.js",
+  title: "Vecivendo",
+  description: "Marketplace para comunidades",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Vecivendo",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport = {
+  themeColor: "#FD366E",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // Mobile-app like feel
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="icon" href={AppwriteIcon} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fira+Code&family=Inter:opsz,wght@14..32,100..900&family=Poppins:wght@300;400&display=swap"
-          rel="stylesheet"
-        />
-        <link rel="icon" type="image/svg+xml" href="/appwrite.svg" />
-      </head>
-      <body className={"bg-[#FAFAFB] font-[Inter] text-sm text-[#56565C]"}>
-        {children}
+    <html lang="es" suppressHydrationWarning>
+      <body className={`${inter.variable} ${nunitoSans.variable} font-sans bg-background text-text-secondary antialiased`}>
+        <ThemeProvider>
+          <ToastProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
