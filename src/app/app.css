@@ -11,6 +11,16 @@
   --color-text-secondary: #56565C;
   --color-border: #EDEDF0;
 
+  /* Admin Panel - Light */
+  --admin-bg: #F3F4F6;
+  --admin-surface: #E5E7EB;
+  --admin-surface-hover: #D1D5DB;
+  --admin-border: #D1D5DB;
+  --admin-text-primary: #111827;
+  --admin-text-secondary: #6B7280;
+  --admin-input-bg: #F3F4F6;
+  --admin-input-border: #D1D5DB;
+
   /* Fonts */
   --font-inter: 'Inter', sans-serif;
   --font-nunito: 'Nunito Sans', sans-serif;
@@ -23,6 +33,15 @@
     --color-text-main: #F4F4F5;
     --color-text-secondary: #A1A1AA;
     --color-border: #3F3F46;
+
+    --admin-bg: #111827;
+    --admin-surface: #1F2937;
+    --admin-surface-hover: #374151;
+    --admin-border: #374151;
+    --admin-text-primary: #F9FAFB;
+    --admin-text-secondary: #D1D5DB;
+    --admin-input-bg: #374151;
+    --admin-input-border: #4B5563;
   }
 }
 
@@ -32,6 +51,32 @@
   --color-text-main: #F4F4F5;
   --color-text-secondary: #A1A1AA;
   --color-border: #3F3F46;
+
+  --admin-bg: #111827;
+  --admin-surface: #1F2937;
+  --admin-surface-hover: #374151;
+  --admin-border: #374151;
+  --admin-text-primary: #F9FAFB;
+  --admin-text-secondary: #D1D5DB;
+  --admin-input-bg: #374151;
+  --admin-input-border: #4B5563;
+}
+
+.light {
+  --color-background: #FAFAFB;
+  --color-surface: #FFFFFF;
+  --color-text-main: #2D2D31;
+  --color-text-secondary: #56565C;
+  --color-border: #EDEDF0;
+
+  --admin-bg: #F3F4F6;
+  --admin-surface: #E5E7EB;
+  --admin-surface-hover: #D1D5DB;
+  --admin-border: #D1D5DB;
+  --admin-text-primary: #111827;
+  --admin-text-secondary: #6B7280;
+  --admin-input-bg: #F3F4F6;
+  --admin-input-border: #D1D5DB;
 }
 
 @theme {
@@ -51,7 +96,17 @@ body {
   background-color: var(--color-background);
   color: var(--color-text-secondary);
   font-family: var(--font-inter);
+  caret-color: transparent;
+  /* Prevent blinking cursor on non-editable text */
 }
+
+/* Restore cursor for input elements */
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: auto;
+}
+
 
 /* Use Nunito Sans for all headings */
 h1,
@@ -145,4 +200,52 @@ h6 {
   animation-name: slideOutDown;
   animation-duration: 0.3s;
   animation-fill-mode: both;
+}
+
+/* Admin Panel Input Styles */
+.admin-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-panel select,
+.admin-panel textarea {
+  background-color: var(--admin-input-bg);
+  border-color: var(--admin-input-border);
+  color: var(--admin-text-primary);
+}
+
+.admin-panel input:focus,
+.admin-panel select:focus,
+.admin-panel textarea:focus {
+  background-color: var(--admin-surface);
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(253, 54, 110, 0.1);
+}
+
+/* Admin Panel Utility Classes */
+.admin-bg {
+  background-color: var(--admin-bg);
+}
+
+.admin-surface {
+  background-color: var(--admin-surface);
+}
+
+.admin-surface-hover {
+  background-color: var(--admin-surface-hover);
+}
+
+.admin-text {
+  color: var(--admin-text-primary);
+}
+
+.admin-text-muted {
+  color: var(--admin-text-secondary);
+}
+
+.admin-border {
+  border-color: var(--admin-border);
+}
+
+/* Admin Panel Hover States */
+.admin-hover:hover {
+  background-color: var(--admin-surface-hover);
 }

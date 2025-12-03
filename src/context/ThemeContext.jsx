@@ -12,9 +12,13 @@ export const ThemeProvider = ({ children }) => {
 
     useEffect(() => {
         // Load saved theme from localStorage
-        const savedTheme = localStorage.getItem("theme");
-        if (savedTheme) {
-            setTheme(savedTheme);
+        try {
+            const savedTheme = localStorage.getItem("theme");
+            if (savedTheme) {
+                setTheme(savedTheme);
+            }
+        } catch (e) {
+            console.warn("Failed to load theme from localStorage:", e);
         }
     }, []);
 
@@ -37,7 +41,11 @@ export const ThemeProvider = ({ children }) => {
         root.classList.add(theme);
 
         // Save to localStorage
-        localStorage.setItem("theme", theme);
+        try {
+            localStorage.setItem("theme", theme);
+        } catch (e) {
+            console.warn("Failed to save theme to localStorage:", e);
+        }
     }, [theme]);
 
     const toggleTheme = () => {

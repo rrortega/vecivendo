@@ -24,10 +24,10 @@ export default function ConsoleLogin() {
 
     return (
         <div className="flex min-h-screen items-center justify-center">
-            <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+            <div className="w-full max-w-md admin-surface rounded-xl shadow-lg p-8">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Console</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2">Inicia sesión para continuar</p>
+                    <h1 className="text-3xl font-bold admin-text">Admin Console</h1>
+                    <p className="admin-text-muted mt-2">Inicia sesión para continuar</p>
                 </div>
 
                 {error && (
@@ -38,7 +38,7 @@ export default function ConsoleLogin() {
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label className="block text-sm font-medium admin-text mb-1">
                             Email
                         </label>
                         <input
@@ -46,14 +46,14 @@ export default function ConsoleLogin() {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
+                            className="w-full px-4 py-2 rounded-lg border admin-border bg-white dark:bg-gray-700 admin-text focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
                             placeholder="admin@vecivendo.com"
                             required
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label className="block text-sm font-medium admin-text mb-1">
                             Contraseña
                         </label>
                         <input
@@ -61,7 +61,7 @@ export default function ConsoleLogin() {
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
+                            className="w-full px-4 py-2 rounded-lg border admin-border bg-white dark:bg-gray-700 admin-text focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
                             placeholder="••••••••"
                             required
                         />

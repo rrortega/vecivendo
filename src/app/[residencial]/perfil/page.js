@@ -4,7 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { Databases, Query, Storage, ID } from "appwrite";
-import { User, Settings, Bell, MapPin, LogOut, Check, Camera, Loader2, ArrowLeft, Moon, Sun, Send, Save } from "lucide-react";
+import { User, Settings, Bell, MapPin, LogOut, Check, Camera, Loader2, ArrowLeft, Moon, Sun, Send, Save, Menu, X, Package, Heart, FileText, Shield, HelpCircle, ShoppingBag, Info } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "@/context/ThemeContext";
@@ -32,6 +32,7 @@ export default function ProfilePage({ params }) {
     const [residencialId, setResidencialId] = React.useState(null);
     const [isUploading, setIsUploading] = React.useState(false);
     const fileInputRef = React.useRef(null);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
     React.useEffect(() => {
         const fetchResidentialDetails = async () => {
@@ -233,6 +234,17 @@ export default function ProfilePage({ params }) {
 
 
 
+    const menuItems = [
+        { icon: User, label: "Mis Datos", href: `/${residencial}/perfil`, active: true },
+        { icon: Package, label: "Mis Pedidos", href: `/${residencial}/historial` },
+        { icon: Heart, label: "Mis Favoritos", href: `/${residencial}/favoritos` },
+        { icon: ShoppingBag, label: "Mis Anuncios", href: `/${residencial}/mis-anuncios` },
+        { icon: FileText, label: "Términos y Condiciones", href: "/legal/terminos-y-condiciones" },
+        { icon: Shield, label: "Política de Privacidad", href: "/legal/politica-de-privacidad" },
+        { icon: Info, label: "Quiénes Somos", href: "/legal/sobre-nosotros" },
+        { icon: HelpCircle, label: "Centro de Ayuda", href: "/centro-de-ayuda" },
+    ];
+
     return (
         <div className="min-h-screen bg-background pb-20 md:pb-0 transition-all duration-300">
             {/* Custom Header with Back Button */}
@@ -244,9 +256,93 @@ export default function ProfilePage({ params }) {
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="ml-2 text-lg font-bold text-text-main">Mi Perfil</h1>
+
+                {/* Mobile Menu Button */}
+                <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="ml-auto lg:hidden p-2 text-text-secondary hover:text-primary transition-colors rounded-full border border-transparent hover:border-primary"
+                >
+                    {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
             </header>
 
-            <div className="max-w-2xl mx-auto pt-20 md:pt-8 px-4 md:px-6">
+            {/* Mobile Menu Overlay */}
+            {isMobileMenuOpen && (
+                <>
+                    <div
+                        className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm lg:hidden"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                    <div className="fixed top-16 right-0 bottom-0 z-[70] w-80 bg-surface border-l border-border shadow-xl lg:hidden overflow-y-auto">
+                        <nav className="p-4 space-y-2">
+                            {menuItems.map((item) => {
+                                const requiresVerification = item.label === "Mis Pedidos" || item.label === "Mis Anuncios";
+                                const isDisabled = requiresVerification && !userProfile?.telefono_verificado;
+
+                                return (
+                                    <button
+                                        key={item.label}
+                                        onClick={() => {
+                                            if (isDisabled) {
+                                                alert("Debes verificar tu teléfono antes de acceder a esta sección");
+                                                return;
+                                            }
+                                            router.push(item.href);
+                                            setIsMobileMenuOpen(false);
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${item.active
+                                            ? "bg-primary/10 text-primary border border-primary"
+                                            : isDisabled
+                                                ? "text-text-secondary/50 cursor-not-allowed border border-transparent"
+                                                : "text-text-secondary hover:bg-surface-hover hover:text-text-main border border-transparent hover:border-border"
+                                            }`}
+                                        disabled={isDisabled}
+                                    >
+                                        <item.icon size={20} />
+                                        <span className="font-medium">{item.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </nav>
+                    </div>
+                </>
+            )}
+
+            {/* Desktop/Tablet Sidebar */}
+            <aside className="hidden lg:block fixed right-8 top-24 lg:w-16 xl:w-72 bg-surface rounded-2xl border border-border shadow-lg lg:p-2 xl:p-4 z-40">
+                <nav className="space-y-2">
+                    {menuItems.map((item) => {
+                        const requiresVerification = item.label === "Mis Pedidos" || item.label === "Mis Anuncios";
+                        const isDisabled = requiresVerification && !userProfile?.telefono_verificado;
+
+                        return (
+                            <button
+                                key={item.label}
+                                onClick={() => {
+                                    if (isDisabled) {
+                                        alert("Debes verificar tu teléfono antes de acceder a esta sección");
+                                        return;
+                                    }
+                                    router.push(item.href);
+                                }}
+                                className={`w-full flex items-center lg:justify-center xl:justify-start gap-3 lg:px-2 xl:px-4 py-3 rounded-lg transition-colors group ${item.active
+                                        ? "bg-primary/10 text-primary border border-primary"
+                                        : isDisabled
+                                            ? "text-text-secondary/50 cursor-not-allowed border border-transparent"
+                                            : "text-text-secondary hover:bg-surface-hover hover:text-text-main border border-transparent hover:border-border"
+                                    }`}
+                                title={item.label}
+                                disabled={isDisabled}
+                            >
+                                <item.icon size={20} className="shrink-0" />
+                                <span className="font-medium hidden xl:block">{item.label}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+            </aside>
+
+            <div className="max-w-2xl mx-auto pt-20 md:pt-20 px-4 md:px-6">
                 {/* Profile Header */}
                 <div className="bg-surface rounded-2xl p-6 mb-6 border border-border">
                     <div className="flex items-center gap-4">
@@ -398,7 +494,7 @@ export default function ProfilePage({ params }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Calle</label>
+                        <label className="block mt-3 text-sm font-medium text-text-secondary mb-1">Calle</label>
                         <input
                             type="text"
                             value={userProfile.calle}
@@ -439,16 +535,18 @@ export default function ProfilePage({ params }) {
                             />
                         </div>
                     </div>
-                    <div>
-                        <LocationPicker
-                            initialLat={userProfile.lat}
-                            initialLng={userProfile.lng}
-                            onLocationSelect={(lat, lng) => updateUserProfile({ lat, lng })}
-                            residentialName={residentialName}
-                            residentialCenter={residentialData?.center}
-                            residentialRadius={residentialData?.radius}
-                        />
-                    </div>
+                    {!isMobileMenuOpen && (
+                        <div>
+                            <LocationPicker
+                                initialLat={userProfile.lat}
+                                initialLng={userProfile.lng}
+                                onLocationSelect={(lat, lng) => updateUserProfile({ lat, lng })}
+                                residentialName={residentialName}
+                                residentialCenter={residentialData?.center}
+                                residentialRadius={residentialData?.radius}
+                            />
+                        </div>
+                    )}
 
                     {userProfile.lat && (
                         <div className="animate-in fade-in slide-in-from-top-4 duration-500">

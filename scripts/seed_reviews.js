@@ -24,47 +24,42 @@ async function seedReviews() {
         }
 
         const ad = ads.documents[0];
-        const advertiserId = typeof ad.anunciante_id === 'object' ? ad.anunciante_id.$id : ad.anunciante_id;
+        const adId = ad.$id;
 
-        if (!advertiserId) {
-            console.log('No advertiser ID found.');
+        if (!adId) {
+            console.log('No ad ID found.');
             return;
         }
 
         const reviews = [
             {
-                anunciante_id: advertiserId,
+                anuncio_id: adId,
                 puntuacion: 5,
                 comentario: 'Excelente servicio, muy rápido y amable.',
-                autor_nombre: 'María G.',
-                fecha: new Date().toISOString()
+                autor_nombre: 'María G.'
             },
             {
-                anunciante_id: advertiserId,
+                anuncio_id: adId,
                 puntuacion: 4,
                 comentario: 'Buen producto, pero la entrega demoró un poco.',
-                autor_nombre: 'Carlos R.',
-                fecha: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+                autor_nombre: 'Carlos R.'
             },
             {
-                anunciante_id: advertiserId,
+                anuncio_id: adId,
                 puntuacion: 5,
                 comentario: 'Totalmente recomendado, volveré a comprar.',
-                autor_nombre: 'Ana P.',
-                fecha: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+                autor_nombre: 'Ana P.'
             }
         ];
 
         for (const review of reviews) {
-            // Try to create review. If collection doesn't exist, this will fail.
-            // We assume collection 'reviews' exists as per requirements implies DB usage.
             await databases.createDocument(
                 DB_ID,
                 COLLECTION_ID,
                 ID.unique(),
                 review
             );
-            console.log(`Created review by: ${review.autor_nombre}`);
+            console.log(`Created review by: ${review.autor_nombre} for ad: ${adId}`);
         }
 
         console.log('Done!');

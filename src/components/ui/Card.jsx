@@ -4,7 +4,7 @@ import { MapPin, Clock, Tag } from "lucide-react";
 import { BaseCard } from "@/components/ui/BaseCard";
 
 export default function Card({ ad, href, layout = "grid" }) {
-    const { titulo, precio, imagenes, categoria, fecha_publicacion, ubicacion } = ad;
+    const { titulo, precio, imagenes, categoria, $updatedAt, ubicacion } = ad;
 
     // Helper to format price
     const formatPrice = (price) => {
@@ -58,7 +58,7 @@ export default function Card({ ad, href, layout = "grid" }) {
                             )}
                             <div className="flex items-center gap-1">
                                 <Clock size={12} />
-                                <span>{formatDate(fecha_publicacion)}</span>
+                                <span>{formatDate($updatedAt)}</span>
                             </div>
                         </div>
                     </div>
@@ -93,7 +93,7 @@ export default function Card({ ad, href, layout = "grid" }) {
                         <span className="font-bold text-lg text-primary">{formatPrice(precio)}</span>
                         <span className="text-xs text-text-secondary flex items-center gap-1">
                             <Clock size={12} />
-                            {formatDate(fecha_publicacion)}
+                            {formatDate($updatedAt)}
                         </span>
                     </div>
                 </div>

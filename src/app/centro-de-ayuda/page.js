@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { databases } from '@/lib/appwrite';
 import { Query } from 'appwrite';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -16,9 +17,12 @@ const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE;
 const COLLECTION_ID = 'contenidos';
 
 export default function HelpCenterPage() {
+    const searchParams = useSearchParams();
+    const initialQuery = searchParams.get('q') || '';
+
     const [articles, setArticles] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
     const [activeCategory, setActiveCategory] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 9;
@@ -102,10 +106,13 @@ export default function HelpCenterPage() {
                         </p>
                     </div>
 
-                    <HelpSearch onSearch={(query) => {
-                        setSearchQuery(query);
-                        setCurrentPage(1);
-                    }} />
+                    <HelpSearch
+                        initialValue={searchQuery}
+                        onSearch={(query) => {
+                            setSearchQuery(query);
+                            setCurrentPage(1);
+                        }}
+                    />
 
                     <HelpCategories
                         categories={categories}

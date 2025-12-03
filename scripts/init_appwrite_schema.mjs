@@ -97,7 +97,6 @@ async function main() {
     await ensureAttribute(dbId, "anuncios", databases.createStringAttribute.bind(databases), "tipo", 20, false);
     // Array of file IDs for images (String array)
     await ensureAttribute(dbId, "anuncios", databases.createStringAttribute.bind(databases), "imagenes", 255, false, undefined, true); // array=true
-    await ensureAttribute(dbId, "anuncios", databases.createDatetimeAttribute.bind(databases), "fecha_publicacion", false);
     await ensureAttribute(dbId, "anuncios", databases.createBooleanAttribute.bind(databases), "activo", true);
     // metadata_ia (JSON) -> String
     await ensureAttribute(dbId, "anuncios", databases.createStringAttribute.bind(databases), "metadata_ia", 5000, false);

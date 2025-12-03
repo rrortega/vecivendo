@@ -1,10 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 
-export default function HelpSearch({ onSearch }) {
-    const [query, setQuery] = useState('');
+export default function HelpSearch({ onSearch, initialValue = '' }) {
+    const [query, setQuery] = useState(initialValue);
+
+    // Update query when initialValue changes (from URL)
+    useEffect(() => {
+        setQuery(initialValue);
+    }, [initialValue]);
 
     const handleSubmit = (e) => {
         e.preventDefault();

@@ -43,7 +43,35 @@ export const CommunityAlertBar = ({ residencialId, residentialSlug }) => {
 
                 // Filter out dismissed alerts from localStorage
                 const dismissed = JSON.parse(localStorage.getItem("dismissed_alerts") || "[]");
-                const activeAlerts = response.documents.filter(doc => !dismissed.includes(doc.$id));
+
+                console.log("Fetched alerts:", response.documents);
+
+                const activeAlerts = response.documents.filter(doc => {
+                    if (!doc) return false;
+
+                    // Check if dismissed
+                    if (dismissed.includes(doc.$id)) return false;
+
+                    // Check expiration
+                    if (doc.duracion_dias && doc.$createdAt) {
+                        try {
+                            const createdDate = new Date(doc.$createdAt);
+                            if (isNaN(createdDate.getTime())) {
+                                console.warn("Invalid date for alert:", doc);
+                                return true; // Keep it visible if date is invalid, or false to hide? Let's keep it.
+                            }
+                            const expirationDate = new Date(createdDate.getTime() + (doc.duracion_dias * 24 * 60 * 60 * 1000));
+                            const now = new Date();
+
+                            if (now > expirationDate) return false;
+                        } catch (e) {
+                            console.error("Error calculating expiration:", e);
+                            return true;
+                        }
+                    }
+
+                    return true;
+                });
 
                 setAlerts(activeAlerts);
             } catch (error) {
@@ -118,7 +146,7 @@ export const CommunityAlertBar = ({ residencialId, residentialSlug }) => {
                                 <div className="flex-1">
                                     <h3 className="text-lg font-bold text-text-main mb-2">{selectedAlert.titulo}</h3>
                                     <p className="text-text-secondary text-sm leading-relaxed">
-                                        {selectedAlert.descripcion}
+                                        {selectedAlert.contenido}
                                     </p>
                                 </div>
                             </div>

@@ -47,24 +47,78 @@ export default function CartPage({ params }) {
 
             try {
                 const itemPromises = cart.map(async (cartItem) => {
-                    const id = cartItem.$id || cartItem.id;
+                    // Use adId if available (for variants), otherwise use id/$id
+                    const realAdId = cartItem.adId || cartItem.$id || cartItem.id;
+                    const cartItemId = cartItem.$id || cartItem.id;
+
                     try {
-                        const ad = await databases.getDocument(dbId, "anuncios", id);
+                        const ad = await databases.getDocument(dbId, "anuncios", realAdId);
+
+                        let finalPrice = ad.precio;
+                        let finalName = ad.titulo;
+                        let variantDetails = {};
+
+                        // If it's a variant, find it in the fetched ad to get fresh price
+                        if (cartItem.variantSlug && ad.variants) {
+                            try {
+                                const parsedVariants = ad.variants.map(v => {
+                                    const parsed = JSON.parse(atob(v));
+                                    return {
+                                        ...parsed,
+                                        slug: (parsed.type || parsed.name).toString().toLowerCase()
+                                            .replace(/\s+/g, '-')
+                                            .replace(/[^\w\-]+/g, '')
+                                            .replace(/\-\-+/g, '-')
+                                            .replace(/^-+/, '')
+                                            .replace(/-+$/, '')
+                                    };
+                                });
+
+                                const match = parsedVariants.find(v => v.slug === cartItem.variantSlug);
+                                if (match) {
+                                    const minQty = match.minQuantity || match.units || 1;
+                                    let vPrice = match.price || match.unit_price;
+                                    if (!vPrice && match.total_price) {
+                                        vPrice = match.total_price / minQty;
+                                    } else if (!vPrice && typeof match.price_raw === 'number') {
+                                        vPrice = match.price_raw;
+                                    }
+                                    finalPrice = vPrice || 0;
+
+                                    // Keep variant name/type from cartItem or update if needed
+                                    // We don't change the main name, but we ensure variant details are preserved
+                                    variantDetails = {
+                                        variant: match.type || match.name,
+                                        price: finalPrice,
+                                        offer: match.offer ? (typeof match.offer === 'string' ? match.offer : match.offer.label) : null,
+                                        minQuantity: parseInt(minQty)
+                                    };
+                                }
+
+                            } catch (e) {
+                                console.error("Error parsing variants in cart refresh:", e);
+                            }
+                        }
+
                         return {
                             ...cartItem, // Keep quantity and other local props
-                            ...ad, // Overwrite with fresh DB data
-                            id: id, // Ensure ID consistency
-                            price: ad.precio, // Use fresh price
-                            name: ad.titulo, // Use fresh title
+                            ...ad, // Overwrite with fresh DB data (images, etc)
+                            ...variantDetails, // Apply fresh variant details if any
+                            id: cartItemId, // Ensure ID remains the composite ID for variants
+                            $id: cartItemId, // Ensure $id remains the composite ID
+                            adId: realAdId, // Persist adId
+                            price: finalPrice, // Use fresh price (variant or base)
+                            name: finalName, // Use fresh title
                             image: (ad.imagenes && ad.imagenes.length > 0) ? ad.imagenes[0] : null, // Fresh image
                             isActive: ad.activo !== false // Assume active unless explicitly false
                         };
                     } catch (error) {
-                        console.error(`Error fetching ad ${id}:`, error);
+                        console.error(`Error fetching ad ${realAdId}:`, error);
                         // If ad not found, mark as unavailable but keep in list so user can remove
                         return {
                             ...cartItem,
-                            id: id,
+                            id: cartItemId,
+                            $id: cartItemId,
                             name: cartItem.name || "Producto no disponible",
                             price: 0,
                             image: null,
@@ -166,63 +220,60 @@ export default function CartPage({ params }) {
 
             // Generate Order ID
             const timestamp = Date.now();
-            const orderId = `VV${timestamp}`;
+            const numeroPedido = `VV${timestamp}`;
 
             // Prepare items for storage using FRESH data
             const orderItems = activeItems.map(item => ({
-                id: item.id,
+                id: item.adId || item.$id || item.id,
                 name: item.name,
                 quantity: item.quantity,
                 price: item.price,
-                variant: item.variant || null
+                variant: item.variant || null,
+                offer: item.offer || null
             }));
 
             // Get Residential ID from first item
-            const residentialId = activeItems[0].residential_id || activeItems[0].residencialId || activeItems[0].residencial_id || "unknown";
-            // Use fresh advertiser info if available, otherwise fallback
-            const advertiserPhone = activeItems[0].advertiser_phone || activeItems[0].telefono_anunciante || activeItems[0].user_phone || activeItems[0].telefono;
+            const residencialId = activeItems[0].residencial.$id;
 
-            // Create Order in Appwrite
+            // Get advertiser info from first item
+            const anuncianteTelefono = activeItems[0].celular_anunciante || activeItems[0].user_phone || activeItems[0].telefono || activeItems[0].phone || "";
+
+            // Prepare address
+            const direccionCompleta = `${userProfile.calle} Mz ${userProfile.manzana} Lt ${userProfile.lote} #${userProfile.casa}`;
+
+            // Create Order in Appwrite (new pedidos collection)
+            const payload = {
+                numero_pedido: numeroPedido,
+                residencial_id: residencialId,
+                comprador_nombre: userProfile.nombre || "",
+                comprador_telefono: userProfile.telefono || "",
+                direccion_entrega: direccionCompleta,
+                calle: userProfile.calle || "",
+                manzana: userProfile.manzana || "",
+                lote: userProfile.lote || "",
+                como_llegar: userProfile.ubicacion || "",
+                items: JSON.stringify(orderItems),
+                total: total,
+                estado: "pendiente",
+                anunciante_telefono: anuncianteTelefono,
+                mensaje_enviado: false
+            };
+            console.log('PEIDO PAYLOAD', payload);
+
             await databases.createDocument(
                 dbId,
-                "orders",
+                "pedidos",
                 ID.unique(),
-                {
-                    order_id: orderId,
-                    user_id: userProfile.userId || "guest",
-                    user_name: userProfile.nombre,
-                    user_phone: userProfile.telefono,
-                    user_address: `${userProfile.calle} Mz ${userProfile.manzana} Lt ${userProfile.lote} #${userProfile.casa}`,
-                    items: JSON.stringify(orderItems),
-                    total: total,
-                    status: "pending",
-                    residential_id: residentialId
-                }
+                payload
             );
 
-            // Construct WhatsApp Message
-            const addressString = `${userProfile.calle} Mz ${userProfile.manzana} Lt ${userProfile.lote} #${userProfile.casa}`;
-            const itemsString = orderItems.map(i => `- ${i.quantity}x ${i.name}`).join('\n');
-
-            const message = `Hola veci, soy ${userProfile.nombre}, de la calle ${userProfile.calle} manzana ${userProfile.manzana} lote ${userProfile.lote} y casa ${userProfile.casa}, y quiero encargarle:
-${itemsString}
-
-Dígame cuál es la forma de pago por favor.
-Este pedido lo he generado por medio de VeciVendo donde está colgado su anuncio y el id de la orden es ${orderId}`;
-
-            const encodedMessage = encodeURIComponent(message);
-
-            const targetPhone = advertiserPhone || "5215555555555";
-
-            const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodedMessage}`;
-
-            showToast(`Pedido ${orderId} creado exitosamente`, "success");
+            showToast(`Pedido ${numeroPedido} creado exitosamente`, "success");
 
             // Clear cart
             clearCart();
 
-            // Redirect
-            window.location.href = whatsappUrl;
+            // Redirect to order details page
+            router.push(`/${residencial}/pedido/${numeroPedido}`);
 
         } catch (error) {
             console.error("Error creating order:", error);

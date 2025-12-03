@@ -15,7 +15,6 @@ async function seedOldAd() {
         console.log('Seeding old ad...');
 
         // Create an ad published 10 days ago
-        const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
         const ad = {
             titulo: 'Anuncio Antiguo de Prueba',
@@ -24,7 +23,6 @@ async function seedOldAd() {
             moneda: 'COP',
             categoria: 'Otros',
             activo: true,
-            fecha_publicacion: oldDate,
             residencial_id: 'residencial-demo', // Assuming this exists or is a string
             anunciante_id: 'user-demo' // Placeholder
         };

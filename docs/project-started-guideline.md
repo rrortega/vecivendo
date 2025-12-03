@@ -111,7 +111,6 @@ El sistema está compuesto por cuatro módulos principales:
 * **categoria** (string)
 * **tipo** (string: producto | servicio)
 * **imagenes** (array de file IDs)
-* **fecha_publicacion** (datetime)
 * **activo** (bool)
 * **metadata_ia** (json)
 

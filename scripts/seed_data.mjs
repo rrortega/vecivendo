@@ -97,8 +97,7 @@ async function main() {
                     moneda: "MXN",
                     categoria: category,
                     tipo: type,
-                    imagenes: [], // Empty array for now
-                    fecha_publicacion: new Date().toISOString(),
+                    imagenes: [], // Empty array for now 
                     activo: true,
                     metadata_ia: JSON.stringify({ keywords: [category, "oferta", "vecivendo"] })
                 }

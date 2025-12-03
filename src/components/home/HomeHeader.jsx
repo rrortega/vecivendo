@@ -10,8 +10,8 @@ import Link from "next/link";
 import { useTheme } from "@/context/ThemeContext";
 import { useCart } from "@/context/CartContext";
 
-export const HomeHeader = ({ residencialName, residentialSlug, sortOption, onSortChange }) => {
-    const { theme, setTheme } = useTheme();
+export const HomeHeader = ({ residencialName, residentialSlug, sortOption, onSortChange, showSearch = true, showFilters = true }) => {
+    const { theme, toggleTheme } = useTheme();
     const { getCartCount } = useCart();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -57,19 +57,7 @@ export const HomeHeader = ({ residencialName, residentialSlug, sortOption, onSor
         // TODO: Implement actual view change in ProductGrid
     };
 
-    const toggleTheme = () => {
-        console.log('Toggle theme clicked. Current theme:', theme);
-        // Get current effective theme
-        const currentEffectiveTheme = theme === "system"
-            ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-            : theme;
 
-        const newTheme = currentEffectiveTheme === "dark" ? "light" : "dark";
-        console.log('Switching from', currentEffectiveTheme, 'to', newTheme);
-
-        // Toggle to opposite
-        setTheme(newTheme);
-    };
 
     const handleSearchChange = (e) => {
         const value = e.target.value;
@@ -102,7 +90,7 @@ export const HomeHeader = ({ residencialName, residentialSlug, sortOption, onSor
         >
             <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 {/* Mobile Search View - Only visible on mobile */}
-                {isSearchActive && (
+                {showSearch && isSearchActive && (
                     <div className="md:hidden w-full flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
                         <div className="relative flex-1">
                             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary" />
@@ -146,38 +134,40 @@ export const HomeHeader = ({ residencialName, residentialSlug, sortOption, onSor
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2 md:gap-4 h-full">
                         {/* Desktop View Controls - Hidden on mobile */}
-                        <div className="hidden md:flex items-center gap-3 h-10">
-                            <select
-                                value={sortOption}
-                                onChange={(e) => onSortChange(e.target.value)}
-                                className="h-full px-3 bg-background border border-border rounded-lg text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer hover:border-primary/50 transition-colors"
-                            >
-                                <option value="recent">Más recientes</option>
-                                <option value="price_asc">Menor precio</option>
-                                <option value="price_desc">Mayor precio</option>
-                            </select>
+                        {showFilters && (
+                            <div className="hidden md:flex items-center gap-3 h-10">
+                                <select
+                                    value={sortOption}
+                                    onChange={(e) => onSortChange(e.target.value)}
+                                    className="h-full px-3 bg-background border border-border rounded-lg text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer hover:border-primary/50 transition-colors"
+                                >
+                                    <option value="recent">Más recientes</option>
+                                    <option value="price_asc">Menor precio</option>
+                                    <option value="price_desc">Mayor precio</option>
+                                </select>
 
-                            <div className="h-full flex items-center bg-background border border-border rounded-lg p-1 gap-1">
-                                <button
-                                    onClick={() => handleViewModeChange("grid")}
-                                    className={`h-full aspect-square flex items-center justify-center rounded transition-all cursor-pointer border border-transparent ${viewMode === "grid"
-                                        ? "bg-surface shadow-sm text-primary"
-                                        : "text-text-secondary hover:border-primary hover:text-text-main"
-                                        }`}
-                                >
-                                    <Grid size={18} />
-                                </button>
-                                <button
-                                    onClick={() => handleViewModeChange("list")}
-                                    className={`h-full aspect-square flex items-center justify-center rounded transition-all cursor-pointer border border-transparent ${viewMode === "list"
-                                        ? "bg-surface shadow-sm text-primary"
-                                        : "text-text-secondary hover:border-primary hover:text-text-main"
-                                        }`}
-                                >
-                                    <List size={18} />
-                                </button>
+                                <div className="h-full flex items-center bg-background border border-border rounded-lg p-1 gap-1">
+                                    <button
+                                        onClick={() => handleViewModeChange("grid")}
+                                        className={`h-full aspect-square flex items-center justify-center rounded transition-all cursor-pointer border border-transparent ${viewMode === "grid"
+                                            ? "bg-surface shadow-sm text-primary"
+                                            : "text-text-secondary hover:border-primary hover:text-text-main"
+                                            }`}
+                                    >
+                                        <Grid size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleViewModeChange("list")}
+                                        className={`h-full aspect-square flex items-center justify-center rounded transition-all cursor-pointer border border-transparent ${viewMode === "list"
+                                            ? "bg-surface shadow-sm text-primary"
+                                            : "text-text-secondary hover:border-primary hover:text-text-main"
+                                            }`}
+                                    >
+                                        <List size={18} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Theme Toggle */}
                         <button
@@ -211,12 +201,14 @@ export const HomeHeader = ({ residencialName, residentialSlug, sortOption, onSor
                         </Link>
 
                         {/* Mobile Search - Restored as per user request */}
-                        <button
-                            onClick={() => setIsSearchActive(true)}
-                            className="md:hidden p-2 text-text-secondary hover:text-primary transition-colors rounded-full border border-transparent hover:border-primary cursor-pointer"
-                        >
-                            <Search size={20} />
-                        </button>
+                        {showSearch && (
+                            <button
+                                onClick={() => setIsSearchActive(true)}
+                                className="md:hidden p-2 text-text-secondary hover:text-primary transition-colors rounded-full border border-transparent hover:border-primary cursor-pointer"
+                            >
+                                <Search size={20} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

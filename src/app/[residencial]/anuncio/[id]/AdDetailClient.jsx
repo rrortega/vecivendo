@@ -6,7 +6,7 @@ import { Databases, Query } from "appwrite";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { CommunityAlertBar } from "@/components/layout/CommunityAlertBar";
 import { Button } from "@/components/ui/Button";
-import { Loader2, AlertCircle, ArrowLeft, MessageCircle, Share2, ShoppingCart, Plus, Minus, User as UserIcon, Package, Heart, Home, Star } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, MessageCircle, Share2, ShoppingCart, Plus, Minus, User as UserIcon, Package, Heart, Home, Star, Gift } from "lucide-react";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -20,7 +20,7 @@ import { useResidential } from "@/hooks/useResidential";
 import { Clock } from "lucide-react";
 
 export default function AdDetailPage({ params }) {
-    const { residencial: residencialSlug, id: adId } = params;
+    const { residencial: residencialSlug, id: adId, variant_slug } = params;
     const router = useRouter();
 
     const [loading, setLoading] = useState(true);
@@ -32,11 +32,24 @@ export default function AdDetailPage({ params }) {
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
 
+    // Variant state
+    const [variants, setVariants] = useState([]);
+    const [selectedVariant, setSelectedVariant] = useState(null);
+
     const { isFavorite, toggleFavorite } = useFavorites();
+
+    // Helper to generate slug
+    const generateSlug = (text) => text.toString().toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
 
     // Calculate expiration
     const updatedAt = ad ? new Date(ad.$updatedAt) : null;
-    const expirationDate = updatedAt ? new Date(updatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+    const validityDays = ad?.dias_vigencia || 7;
+    const expirationDate = updatedAt ? new Date(updatedAt.getTime() + validityDays * 24 * 60 * 60 * 1000) : null;
     const now = new Date();
     const timeRemaining = expirationDate ? expirationDate - now : 0;
     const daysRemaining = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
@@ -56,31 +69,106 @@ export default function AdDetailPage({ params }) {
                 const adData = await databases.getDocument(dbId, "anuncios", adId);
                 setAd(adData);
 
+                // Parse Variants
+                if (adData.variants && adData.variants.length > 0) {
+                    try {
+                        const parsedVariants = adData.variants.map(v => {
+                            const parsed = JSON.parse(atob(v));
+                            // Map fields to consistent structure
+                            // Support both schemas: 
+                            // New: type, price, minQuantity, offer
+                            // Old/Existing: name, total_price (or price_raw), units, offer (object or string)
+
+                            const type = parsed.type || parsed.name;
+                            const minQuantity = parsed.minQuantity || parsed.units || 1;
+                            let price = parsed.price || parsed.unit_price;
+
+                            if (!price && parsed.total_price) {
+                                price = parsed.total_price / minQuantity;
+                            } else if (!price && typeof parsed.price_raw === 'number') {
+                                price = parsed.price_raw;
+                            }
+
+                            price = price || 0;
+
+                            // Handle offer: could be string or object
+                            let offerText = null;
+                            if (parsed.offer) {
+                                if (typeof parsed.offer === 'string') {
+                                    offerText = parsed.offer;
+                                } else if (typeof parsed.offer === 'object' && parsed.offer.label) {
+                                    offerText = parsed.offer.label;
+                                }
+                            }
+
+                            return {
+                                ...parsed,
+                                type,
+                                price,
+                                minQuantity,
+                                offer: offerText,
+                                slug: generateSlug(type)
+                            };
+                        });
+                        setVariants(parsedVariants);
+
+                        // Select variant based on slug or default to null (main ad)
+                        if (variant_slug) {
+                            const match = parsedVariants.find(v => v.slug === variant_slug);
+                            if (match) {
+                                setSelectedVariant(match);
+                                setQuantity(parseInt(match.minQuantity) || 1);
+                            }
+                        } else {
+                            setSelectedVariant(null);
+                        }
+                    } catch (e) {
+                        console.error("Error parsing variants:", e);
+                    }
+                }
+
+                // Log View
+                import("@/lib/analytics").then(({ logAdView }) => {
+                    // Log view with variant info if selected
+                    // We might need to wait for state update or just pass it directly
+                    // For now, logging the main ad view. 
+                    // Ideally, we should log the specific variant view if applicable.
+                    logAdView(adData.$id, false, null, "view");
+                });
+
                 // Fetch Related Ads from same seller (anunciante)
-                // We try to find the advertiser ID from common fields.
-                const advertiserId = adData.userId || adData.user_id || adData.anuncianteId;
+                // Priority: celular > userId > user_id > anuncianteId
+                let queryField = null;
+                let queryValue = null;
 
-                if (advertiserId) {
-                    // Determine which field matched to use in the query
-                    const queryField = adData.userId ? 'userId' : (adData.user_id ? 'user_id' : 'anuncianteId');
+                if (adData.celular) {
+                    queryField = 'celular';
+                    queryValue = adData.celular;
+                } else if (adData.userId) {
+                    queryField = 'userId';
+                    queryValue = adData.userId;
+                } else if (adData.user_id) {
+                    queryField = 'user_id';
+                    queryValue = adData.user_id;
+                } else if (adData.anuncianteId) {
+                    queryField = 'anuncianteId';
+                    queryValue = adData.anuncianteId;
+                }
 
+                if (queryField && queryValue) {
                     const relatedList = await databases.listDocuments(
                         dbId,
                         "anuncios",
                         [
-                            Query.equal(queryField, advertiserId),
-                            Query.equal("activo", true),
+                            Query.equal(queryField, queryValue),
+                            Query.equal("active", true), // Ensure we use 'active' or 'activo' consistently. Schema says 'active' in some places.
                             Query.notEqual("$id", adId),
                             Query.limit(4)
                         ]
                     );
                     setRelatedAds(relatedList.documents);
                 } else {
-                    // If no advertiser ID found, we can't show ads from the same advertiser.
-                    // However, to avoid empty section if data is missing, we could fallback to residential ads?
-                    // User requested "solo si hay mas anuncios de ese anunciante".
-                    // So we keep it empty if we can't identify the advertiser.
-                    console.log("No advertiser ID found in ad data:", adData);
+                    console.log("No advertiser identifier found in ad data:", adData);
                     setRelatedAds([]);
                 }
 
@@ -95,7 +183,7 @@ export default function AdDetailPage({ params }) {
         if (adId) {
             fetchData();
         }
-    }, [adId]);
+    }, [adId, variant_slug]);
 
     const { residential: residentialData } = useResidential(residencialSlug);
     const residentialName = residentialData?.nombre || residencialSlug;
@@ -106,10 +194,30 @@ export default function AdDetailPage({ params }) {
     const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
 
     const handleAddToCart = () => {
-        const result = addToCart(ad, quantity);
+        let productToAdd = { ...ad };
+
+        if (selectedVariant) {
+            // Create a composite ID for the cart item to distinguish variants
+            productToAdd = {
+                ...productToAdd,
+                $id: `${ad.$id}-${selectedVariant.slug}`,
+                adId: ad.$id, // Keep reference to original ad ID
+                price: selectedVariant.price,
+                variant: selectedVariant.type,
+                variantSlug: selectedVariant.slug,
+                offer: selectedVariant.offer,
+                minQuantity: parseInt(selectedVariant.minQuantity)
+            };
+        }
+
+        const result = addToCart(productToAdd, quantity);
 
         if (result.success) {
             showToast(`${quantity} artículo(s) agregado(s) al carrito`, "success");
+            // Log add to cart interaction
+            import("@/lib/analytics").then(({ logAdView }) => {
+                logAdView(ad.$id, false, null, "click");
+            });
         } else if (result.error === "advertiser_mismatch") {
             setIsConflictModalOpen(true);
         } else {
@@ -161,7 +269,7 @@ export default function AdDetailPage({ params }) {
         return (
             <div className="min-h-screen flex flex-col bg-background" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
                 <CommunityAlertBar residentialSlug={residencialSlug} />
-                <HomeHeader residencialName={residentialName} />
+                <HomeHeader residencialName={residentialName} showSearch={false} showFilters={false} />
 
                 <div className="flex-grow flex flex-col items-center justify-center p-4 text-center pt-20">
                     <AlertCircle className="text-red-500 mb-4" size={48} />
@@ -181,7 +289,7 @@ export default function AdDetailPage({ params }) {
     return (
         <div className="min-h-screen bg-background pb-24" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
             <CommunityAlertBar residentialSlug={residencialSlug} />
-            <HomeHeader residencialName={residentialName} residentialSlug={residencialSlug} />
+            <HomeHeader residencialName={residentialName} residentialSlug={residencialSlug} showSearch={false} showFilters={false} />
 
             <main className="max-w-7xl mx-auto px-4 pt-20 md:pt-24">
                 {/* Back Button */}
@@ -256,11 +364,73 @@ export default function AdDetailPage({ params }) {
                             </h1>
                             <div className="flex items-baseline gap-2">
                                 <span className="text-4xl md:text-5xl font-bold text-primary">
-                                    {formatPrice(ad.precio)}
+                                    {formatPrice(selectedVariant ? selectedVariant.price : ad.precio)}
                                 </span>
                                 <span className="text-text-secondary text-lg">{ad.moneda || 'MXN'}</span>
                             </div>
+                            {selectedVariant && (
+                                <p className="text-sm text-text-secondary mt-1">
+                                    Precio por {selectedVariant.type} (Mínimo {selectedVariant.minQuantity} unidades)
+                                </p>
+                            )}
                         </div>
+
+                        {/* Variants Selector */}
+                        {variants.length > 0 && (
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
+                                    Variantes disponibles
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        onClick={() => router.push(`/${residencialSlug}/anuncio/${adId}`)}
+                                        className={`px-4 py-2 rounded-lg border transition-all text-left relative ${!selectedVariant
+                                            ? 'bg-primary text-white border-primary'
+                                            : 'bg-surface text-text-main border-border hover:border-primary'
+                                            }`}
+                                    >
+                                        <div className="font-medium">Estándar</div>
+                                        <div className={`text-xs ${!selectedVariant ? 'text-white/80' : 'text-text-secondary'}`}>
+                                            {formatPrice(ad.precio)}
+                                        </div>
+                                    </button>
+                                    {variants.map((variant, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => router.push(`/${residencialSlug}/anuncio/${adId}/${variant.slug}`)}
+                                            className={`px-4 py-2 rounded-lg border transition-all text-left relative ${selectedVariant && selectedVariant.slug === variant.slug
+                                                ? 'bg-primary text-white border-primary'
+                                                : 'bg-surface text-text-main border-border hover:border-primary'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium">{variant.type}</span>
+                                                {variant.offer && (
+                                                    <Gift size={14} className={selectedVariant && selectedVariant.slug === variant.slug ? 'text-white' : 'text-primary'} />
+                                                )}
+                                            </div>
+                                            <div className={`text-xs ${selectedVariant && selectedVariant.slug === variant.slug ? 'text-white/80' : 'text-text-secondary'}`}>
+                                                {formatPrice(variant.price)}
+                                                {parseInt(variant.minQuantity) > 1 && ` x ${variant.minQuantity}`}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Offer Details */}
+                                {selectedVariant && selectedVariant.offer && (
+                                    <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg flex gap-3 items-start animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="p-2 bg-primary/10 rounded-full shrink-0">
+                                            <Gift size={18} className="text-primary" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold text-primary text-sm mb-0.5">¡Oferta Especial!</h4>
+                                            <p className="text-sm text-text-main">{selectedVariant.offer}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Expiration Info */}
                         <div className="flex items-center gap-2 text-sm text-text-secondary bg-surface border border-border px-3 py-2 rounded-lg w-fit">
@@ -373,11 +543,11 @@ export default function AdDetailPage({ params }) {
                                 {/* Quantity Selector */}
                                 <div className={`flex items-center gap-2 bg-background rounded-full border border-border px-3 h-14 ${!isActive ? 'opacity-50 pointer-events-none' : ''}`}>
                                     <button
-                                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                        onClick={() => setQuantity(Math.max((selectedVariant ? parseInt(selectedVariant.minQuantity) : 1), quantity - 1))}
                                         className="p-2 border border-transparent hover:border-primary rounded-full transition-colors"
-                                        disabled={quantity <= 1}
+                                        disabled={quantity <= (selectedVariant ? parseInt(selectedVariant.minQuantity) : 1)}
                                     >
-                                        <Minus size={20} className={quantity <= 1 ? 'text-text-secondary/50' : 'text-text-main'} />
+                                        <Minus size={20} className={quantity <= (selectedVariant ? parseInt(selectedVariant.minQuantity) : 1) ? 'text-text-secondary/50' : 'text-text-main'} />
                                     </button>
                                     <span className="w-12 text-center font-bold text-text-main text-lg">{quantity}</span>
                                     <button
@@ -395,7 +565,12 @@ export default function AdDetailPage({ params }) {
                                     className={`flex-1 h-14 gap-2 text-base font-semibold rounded-2xl ${!isActive ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300' : ''}`}
                                 >
                                     <ShoppingCart size={20} />
-                                    {isActive ? `Agregar al carrito • ${formatPrice(ad.precio * quantity)}` : 'No disponible'}
+                                    {isActive ? (
+                                        <>
+                                            <span className="hidden md:inline">Agregar al carrito • </span>
+                                            <span>{formatPrice((selectedVariant ? selectedVariant.price : ad.precio) * quantity)}</span>
+                                        </>
+                                    ) : 'No disponible'}
                                 </Button>
                             </div>
                         </div>

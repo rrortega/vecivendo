@@ -45,7 +45,7 @@ export const ReviewsSection = ({ adId, onModalOpenChange }) => {
                     "reviews",
                     [
                         Query.equal("anuncio_id", adId),
-                        Query.orderDesc("fecha"),
+                        Query.orderDesc("$createdAt"),
                         Query.limit(50)
                     ]
                 );
@@ -59,14 +59,7 @@ export const ReviewsSection = ({ adId, onModalOpenChange }) => {
                 }
             } catch (error) {
                 console.error("Error fetching reviews:", error);
-                // Fallback/Mock data
-                setReviews([
-                    { $id: '1', autor_nombre: 'Usuario Demo', puntuacion: 5, comentario: 'Excelente producto, tal como se describe.', fecha: new Date().toISOString() },
-                    { $id: '2', autor_nombre: 'Vecino 2', puntuacion: 4, comentario: 'Muy buen estado.', fecha: new Date(Date.now() - 86400000).toISOString() },
-                    { $id: '3', autor_nombre: 'Vecino 3', puntuacion: 5, comentario: 'Recomendado 100%.', fecha: new Date(Date.now() - 172800000).toISOString() },
-                    { $id: '4', autor_nombre: 'Vecino 4', puntuacion: 3, comentario: 'Estaba bien pero la entrega demoró.', fecha: new Date(Date.now() - 259200000).toISOString() }
-                ]);
-                setAverageRating(4.3);
+                setReviews([]);
             } finally {
                 setLoading(false);
             }
@@ -165,7 +158,7 @@ const ReviewCard = ({ review }) => (
         </div>
         <p className="text-sm text-text-secondary leading-relaxed">{review.comentario}</p>
         <span className="text-xs text-gray-400 mt-2 block">
-            {new Date(review.fecha).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date(review.$createdAt).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
         </span>
     </div>
 );

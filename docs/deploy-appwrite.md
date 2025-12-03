@@ -1,142 +1,94 @@
-# Guía de Despliegue y Configuración en Appwrite
+# Guía de Despliegue en Appwrite
 
-Esta guía detalla los pasos necesarios para configurar el backend de Appwrite para el proyecto Vecivendo y preparar el entorno para su despliegue.
+Esta guía detalla los pasos necesarios para configurar y desplegar el backend de Vecivendo utilizando Appwrite.
 
-## 1. Requisitos Previos
+## Prerrequisitos
 
-*   **Instancia de Appwrite**: Necesitas tener acceso a una instancia de Appwrite. Puede ser:
-    *   **Appwrite Cloud**: La opción más sencilla (https://cloud.appwrite.io).
-    *   **Auto-alojado**: Una instancia corriendo en tu propio servidor o localmente mediante Docker.
-*   **Node.js**: Versión 18 o superior instalada en tu entorno local para ejecutar los scripts de configuración.
-*   **Git**: Para clonar el repositorio.
+1.  **Instancia de Appwrite**: Necesitas tener una instancia de Appwrite corriendo. Puede ser:
+    *   Appwrite Cloud (https://cloud.appwrite.io/)
+    *   Una instancia auto-alojada (Self-hosted) en tu propio servidor (DigitalOcean, AWS, etc.).
+2.  **Appwrite CLI**: Recomendado para gestionar despliegues y configuraciones desde la terminal.
+    *   Instalación: `npm install -g appwrite-cli`
+    *   Login: `appwrite login`
 
-## 2. Configuración del Proyecto en Appwrite
+## Configuración del Proyecto
 
-1.  **Crear Proyecto**:
-    *   Accede a tu consola de Appwrite.
-    *   Crea un nuevo proyecto llamado `Vecivendo`.
-    *   Anota el `Project ID`.
-
-2.  **Crear API Key**:
-    *   Ve a la sección **Overview** > **Integrations** > **API Keys**.
-    *   Crea una nueva API Key (ej. nombre: `Setup Script`).
-    *   Asigna los siguientes permisos (Scopes) para permitir que los scripts configuren la base de datos:
-        *   `databases.read`, `databases.write`
-        *   `collections.read`, `collections.write`
-        *   `attributes.read`, `attributes.write`
-        *   `documents.read`, `documents.write`
-        *   `indexes.read`, `indexes.write`
-        *   `users.read`, `users.write`
-    *   Copia la `API Key Secret`.
-
-3.  **Crear Base de Datos**:
-    *   Ve a la sección **Databases**.
-    *   Crea una nueva base de datos.
-    *   Nombre: `Vecivendo DB`
-    *   Database ID: `vecivendo-db` (Recomendado para coincidir con los scripts, si usas otro ID deberás configurarlo en las variables de entorno).
-
-## 3. Configuración de Variables de Entorno
-
-En tu entorno local (y posteriormente en tu servidor de producción), necesitas configurar las variables de entorno.
-
-1.  Crea un archivo `.env.local` en la raíz del proyecto (puedes copiar `.env.example`).
-2.  Configura las siguientes variables:
-
-```bash
-# Endpoint de Appwrite (ej. https://cloud.appwrite.io/v1 o tu IP local)
-NEXT_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-
-# ID del Proyecto creado
-NEXT_PUBLIC_APPWRITE_PROJECT_ID=tu_project_id
-
-# ID de la Base de Datos
-NEXT_PUBLIC_APPWRITE_DATABASE=vecivendo-db
-
-# API Key creada en el paso anterior (Solo necesaria para scripts de setup y funciones del servidor)
-APPWRITE_API_KEY=tu_api_key_secreta
-```
-
-## 4. Inicialización del Esquema de Base de Datos
-
-El proyecto incluye scripts automatizados para crear la estructura de la base de datos (colecciones, atributos y relaciones). Ejecútalos en el siguiente orden desde la raíz del proyecto:
-
-### Paso 1: Esquema Principal
-Ejecuta el script que define las colecciones principales (`residenciales`, `anuncios`, `pedidos`, etc.):
-
-```bash
-node scripts/init_appwrite_schema.mjs
-```
-
-### Paso 2: Colecciones de Soporte
-Ejecuta los scripts para configurar colecciones adicionales:
-
-```bash
-# Configuración global y contenidos (FAQs, Términos, etc.)
-node setup_config_content.mjs
-
-# Avisos de la comunidad
-node setup_avisos.mjs
-
-# Grupos de WhatsApp
-node setup_whatsapp_groups.mjs
-```
-
-### Paso 3: Configurar Relaciones
-Para asegurar que todas las relaciones entre colecciones estén correctamente enlazadas:
-
-```bash
-node setup_relationships.mjs
-```
-
-## 5. Carga de Datos de Prueba (Seeding)
-
-Para poblar la base de datos con información inicial, útil para verificar que todo funcione correctamente:
-
-1.  **Crear Residenciales**:
-    ```bash
-    node scripts/seed_residential.js
+1.  **Crear Proyecto**: En tu consola de Appwrite, crea un nuevo proyecto (ej. `vecivendo`).
+2.  **ID del Proyecto**: Copia el `Project ID` y agrégalo a tus variables de entorno en el frontend (`.env.local`):
+    ```env
+    NEXT_PUBLIC_APPWRITE_PROJECT_ID=tu_project_id
+    NEXT_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 # o tu endpoint
     ```
 
-2.  **Crear Anuncios de Ejemplo**:
-    ```bash
-    node seed_anuncios.mjs
-    ```
+## Base de Datos y Colecciones
 
-3.  **Crear Contenido de Ayuda**:
-    ```bash
-    node seed_help_center.mjs
-    ```
+El sistema utiliza una base de datos principal (ej. `vecivendo-db`). Asegúrate de crearla y configurar las siguientes colecciones:
 
-## 6. Despliegue del Frontend
+### 1. Colección `configuracion_global`
+*   **Propósito**: Almacenar configuraciones generales del sitio (redes sociales, contacto).
+*   **Permisos**: Lectura pública (`role:all`), Escritura solo Admin (`role:member` con etiqueta admin o equipo admin).
+*   **Atributos**:
+    *   `whatsapp_asistencia` (string)
+    *   `email_soporte` (string, email)
+    *   `facebook_url` (string, url)
+    *   `instagram_url` (string, url)
+    *   `twitter_url` (string, url)
 
-La aplicación es un proyecto **Next.js**, por lo que puede desplegarse en cualquier plataforma compatible.
+### 2. Colección `residenciales`
+*   **Propósito**: Almacenar la información de los residenciales.
+*   **Permisos**: Lectura pública, Escritura Admin.
+*   **Atributos**:
+    *   `nombre` (string, required)
+    *   `slug` (string, required, unique)
+    *   `direccion` (string)
+    *   `country` (string, ej. "MX")
+    *   `moneda` (string, ej. "MXN") - *Opcional si se requiere*
+    *   `phone_prefix` (string)
+    *   `ubicacion_centro_lat` (float)
+    *   `ubicacion_centro_lng` (float)
+    *   `radio_autorizado_metros` (integer)
+    *   `grupos_whatsapp` (relationship: one-to-many con `grupos_whatsapp`)
+    *   `active` (boolean)
 
-### Opción A: Vercel (Recomendado)
-1.  Sube tu código a GitHub/GitLab/Bitbucket.
-2.  Importa el proyecto en Vercel.
-3.  En la configuración del proyecto en Vercel, añade las variables de entorno:
-    *   `NEXT_PUBLIC_APPWRITE_ENDPOINT`
-    *   `NEXT_PUBLIC_APPWRITE_PROJECT_ID`
-    *   `NEXT_PUBLIC_APPWRITE_DATABASE`
-    *   *(No incluyas `APPWRITE_API_KEY` en el frontend a menos que uses Server Actions o API Routes que la requieran explícitamente)*.
-4.  Despliega.
+### 3. Colección `grupos_whatsapp`
+*   **Propósito**: Grupos de WhatsApp asociados a residenciales.
+*   **Permisos**: Lectura pública, Escritura Admin.
+*   **Atributos**:
+    *   `name` (string)
+    *   `wspp_id` (string)
+    *   `residencial` (relationship: many-to-one con `residenciales`)
 
-### Opción B: Docker
-Puedes construir una imagen Docker para desplegar en cualquier VPS o contenedor.
+### 4. Colección `messages` (Mensajes)
+*   **Propósito**: Historial de mensajes o notificaciones.
+*   **Atributos**: Según requerimientos del sistema de mensajería.
 
-```bash
-# Construir imagen
-docker build -t vecivendo-app .
+## Storage (Almacenamiento)
 
-# Ejecutar contenedor
-docker run -p 3000:3000 \
-  -e NEXT_PUBLIC_APPWRITE_ENDPOINT=... \
-  -e NEXT_PUBLIC_APPWRITE_PROJECT_ID=... \
-  vecivendo-app
-```
+Crea un bucket para almacenar imágenes (logos, banners, etc.).
+*   **Bucket ID**: Configura este ID en tus variables de entorno si es necesario.
+*   **Permisos**: Lectura pública (`role:all`).
 
-## 7. Verificación Final
+## Funciones (Functions)
 
-1.  Accede a la URL de tu aplicación desplegada.
-2.  Verifica que la página de inicio cargue los banners y productos (esto confirma la conexión con Appwrite).
-3.  Intenta navegar a las diferentes secciones.
+Si utilizas Appwrite Functions para lógica del servidor (ej. cron jobs, procesar pagos):
+1.  Navega al directorio de funciones.
+2.  Despliega usando el CLI: `appwrite functions deploy`.
+
+## Autenticación y Usuarios
+
+1.  **Admin**: Crea tu usuario administrador manualmente o mediante registro.
+2.  **Etiquetas (Labels)**: Para acceder al panel de administración (`/console`), el usuario debe tener la etiqueta `admin`. Puedes asignarla desde la consola de Appwrite en la sección "Auth" > "Users" > Seleccionar usuario > "Labels".
+
+## Verificación
+
+1.  Levanta tu aplicación frontend localmente.
+2.  Intenta iniciar sesión en `/console`.
+3.  Verifica que carguen los datos de las colecciones.
+
+## Solución de Problemas Comunes
+
+*   **Error 401 (Unauthorized)**: Revisa los permisos de la colección (Settings > Permissions). Asegúrate de que el rol `admin` o el usuario específico tenga permisos de Lectura/Escritura según corresponda.
+*   **CORS**: Si estás en desarrollo local, añade `localhost` como plataforma web en tu proyecto de Appwrite (Overview > Platforms > Add Platform > Web).
+
+---
+*Documento generado para Vecivendo.*

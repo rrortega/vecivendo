@@ -1,0 +1,412 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { databases } from "@/lib/appwrite";
+import { useToast } from "@/context/ToastContext";
+import { Save, Trash2, AlertTriangle, FileText, Image, Package } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ID, Query } from "appwrite";
+import ConfirmModal from "@/components/console/ConfirmModal";
+import VariantsManager from "@/components/console/ads/VariantsManager";
+
+export default function AdEditForm({ ad }) {
+    const isEditing = !!ad;
+
+    const [formData, setFormData] = useState({
+        titulo: ad?.titulo || "",
+        descripcion: ad?.descripcion || "",
+        precio: ad?.precio || 0,
+        categoria: ad?.categoria || "",
+        residencial: ad?.residencial || "",
+        celular_anunciante: ad?.celular_anunciante || "",
+        dias_vigencia: ad?.dias_vigencia || 7,
+        imagenes: ad?.imagenes || [],
+        variants: ad?.variants || [],  // Array de strings en base64
+        active: ad?.activo ?? true,  // Mapeado de 'activo' en DB a 'active' en el estado
+    });
+    const [residentials, setResidentials] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'images', 'variants'
+    const { showToast } = useToast();
+    const router = useRouter();
+
+    const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+    const collectionId = "anuncios";
+
+    useEffect(() => {
+        fetchResidentials();
+    }, []);
+
+    const fetchResidentials = async () => {
+        try {
+            const response = await databases.listDocuments(dbId, "residenciales", [
+                Query.limit(100),
+                Query.orderAsc("nombre")
+            ]);
+            setResidentials(response.documents);
+        } catch (error) {
+            console.error("Error fetching residentials:", error);
+        }
+    };
+
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === "checkbox" ? checked : value
+        }));
+    };
+
+    const handleImageChange = (index, value) => {
+        const newImages = [...formData.imagenes];
+        newImages[index] = value;
+        setFormData(prev => ({ ...prev, imagenes: newImages }));
+    };
+
+    const addImageField = () => {
+        setFormData(prev => ({ ...prev, imagenes: [...prev.imagenes, ""] }));
+    };
+
+    const removeImageField = (index) => {
+        const newImages = formData.imagenes.filter((_, i) => i !== index);
+        setFormData(prev => ({ ...prev, imagenes: newImages }));
+    };
+
+    const isValidUrl = (string) => {
+        try {
+            new URL(string);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const data = {
+                titulo: formData.titulo,
+                descripcion: formData.descripcion,
+                precio: parseFloat(formData.precio),
+                categoria: formData.categoria,
+                residencial: formData.residencial || null,
+                celular_anunciante: formData.celular_anunciante || null,
+                dias_vigencia: parseInt(formData.dias_vigencia),
+                imagenes: formData.imagenes.filter(url => url && isValidUrl(url)),
+                variants: formData.variants,  // Array de strings en base64
+                activo: formData.active  // Cambiado de 'active' a 'activo' para coincidir con el esquema
+            };
+
+            console.log('📤 Enviando datos del anuncio:', data);
+            console.log('🔍 Tipo de operación:', isEditing ? 'UPDATE' : 'CREATE');
+
+            if (isEditing) {
+                console.log('📝 Actualizando documento con ID:', ad.$id);
+                const response = await databases.updateDocument(
+                    dbId,
+                    collectionId,
+                    ad.$id,
+                    data
+                );
+                console.log('✅ Respuesta de actualización:', response);
+                showToast("Anuncio actualizado correctamente", "success");
+                router.refresh();
+            } else {
+                console.log('🆕 Creando nuevo documento');
+                const response = await databases.createDocument(
+                    dbId,
+                    collectionId,
+                    ID.unique(),
+                    data
+                );
+                console.log('✅ Respuesta de creación:', response);
+                showToast("Anuncio creado correctamente", "success");
+                router.push("/console/free-ads");
+            }
+        } catch (error) {
+            console.error('❌ Error completo:', error);
+            console.error('❌ Error message:', error.message);
+            console.error('❌ Error code:', error.code);
+            console.error('❌ Error type:', error.type);
+            console.error('❌ Error response:', error.response);
+            showToast(isEditing ? "Error al actualizar el anuncio" : "Error al crear el anuncio", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        setLoading(true);
+        try {
+            await databases.deleteDocument(
+                dbId,
+                collectionId,
+                ad.$id
+            );
+            console.log('✅ Anuncio eliminado:', ad.$id);
+            showToast("Anuncio eliminado correctamente", "success");
+            router.push("/console/free-ads");
+        } catch (error) {
+            console.error('❌ Error eliminando anuncio:', error);
+            showToast("Error al eliminar el anuncio", "error");
+            setLoading(false);
+        }
+    };
+
+    const tabs = [
+        { id: 'basic', label: 'Información Básica', icon: FileText },
+        { id: 'images', label: 'Imágenes', icon: Image },
+        { id: 'variants', label: 'Variantes', icon: Package },
+    ];
+
+    return (
+        <div className="admin-surface rounded-xl border admin-border shadow-sm p-6">
+            {/* Tabs */}
+            <div className="flex gap-2 mb-6 border-b admin-border overflow-x-auto">
+                {tabs.map(tab => {
+                    const Icon = tab.icon;
+                    return (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
+                                    ? 'border-primary-600 text-primary-600 font-medium'
+                                    : 'border-transparent admin-text-muted hover:text-primary-600'
+                                }`}
+                        >
+                            <Icon size={18} />
+                            {tab.label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-8">
+                {/* TAB: INFORMACIÓN BÁSICA */}
+                {activeTab === 'basic' && (
+                    <div className="space-y-8">
+                        {/* SECCIÓN 1: INFORMACIÓN DEL ANUNCIANTE */}
+                        <div>
+                            <h3 className="text-lg font-semibold admin-text mb-4 pb-2 border-b admin-border">
+                                Información del Anunciante
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium admin-text">Celular del Anunciante</label>
+                                    <input
+                                        type="tel"
+                                        name="celular_anunciante"
+                                        value={formData.celular_anunciante}
+                                        onChange={handleChange}
+                                        placeholder="Ej: 5512345678"
+                                        className="w-full px-4 py-2 rounded-lg border admin-border admin-bg admin-text focus:ring-2 focus:ring-primary-500 outline-none"
+                                    />
+                                    <p className="text-xs admin-text-muted">Número de contacto del anunciante (opcional)</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium admin-text">Residencial</label>
+                                    <select
+                                        name="residencial"
+                                        value={formData.residencial}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 rounded-lg border admin-border admin-bg admin-text focus:ring-2 focus:ring-primary-500 outline-none"
+                                    >
+                                        <option value="">Sin residencial</option>
+                                        {residentials.map((res) => (
+                                            <option key={res.$id} value={res.$id}>
+                                                {res.nombre}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs admin-text-muted">Residencial al que pertenece este anuncio (opcional)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SECCIÓN 2: INFORMACIÓN DEL ANUNCIO */}
+                        <div>
+                            <h3 className="text-lg font-semibold admin-text mb-4 pb-2 border-b admin-border">
+                                Información del Anuncio
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium admin-text">Título</label>
+                                    <input
+                                        type="text"
+                                        name="titulo"
+                                        value={formData.titulo}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 rounded-lg border admin-border admin-bg admin-text focus:ring-2 focus:ring-primary-500 outline-none"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium admin-text">Precio</label>
+                                    <input
+                                        type="number"
+                                        name="precio"
+                                        value={formData.precio}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 rounded-lg border admin-border admin-bg admin-text focus:ring-2 focus:ring-primary-500 outline-none"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium admin-text">Días de Vigencia</label>
+                                    <input
+                                        type="number"
+                                        name="dias_vigencia"
+                                        value={formData.dias_vigencia}
+                                        onChange={handleChange}
+                                        min="1"
+                                        className="w-full px-4 py-2 rounded-lg border admin-border admin-bg admin-text focus:ring-2 focus:ring-primary-500 outline-none"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium admin-text">Categoría</label>
+                                    <select
+                                        name="categoria"
+                                        value={formData.categoria}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 rounded-lg border admin-border admin-bg admin-text focus:ring-2 focus:ring-primary-500 outline-none"
+                                        required
+                                    >
+                                        <option value="">Seleccionar categoría</option>
+                                        <option value="comida">Comida</option>
+                                        <option value="vehiculos">Vehículos</option>
+                                        <option value="tecnologia">Tecnología</option>
+                                        <option value="electrodomesticos">Electrodomésticos</option>
+                                        <option value="ropa">Ropa</option>
+                                        <option value="deportes">Deportes</option>
+                                        <option value="servicios">Servicios</option>
+                                        <option value="muebles">Muebles</option>
+                                        <option value="otros">Otros</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 mt-6"> {/* Added mt-6 for spacing */}
+                                <label className="text-sm font-medium admin-text">Descripción</label>
+                                <textarea
+                                    name="descripcion"
+                                    value={formData.descripcion}
+                                    onChange={handleChange}
+                                    rows={4}
+                                    className="w-full px-4 py-2 rounded-lg border admin-border admin-bg admin-text focus:ring-2 focus:ring-primary-500 outline-none resize-none"
+                                    required
+                                />
+                            </div>
+                        </div>
+                )}
+
+                        {/* TAB: IMÁGENES */}
+                        {activeTab === 'images' && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium admin-text">URLs de Imágenes o Videos</label>
+                                <div className="space-y-3">
+                                    {formData.imagenes.map((url, index) => (
+                                        <div key={index} className="flex gap-2">
+                                            <input
+                                                type="url"
+                                                value={url}
+                                                onChange={(e) => handleImageChange(index, e.target.value)}
+                                                placeholder="https://ejemplo.com/imagen.jpg"
+                                                className={`flex-1 px-4 py-2 rounded-lg border ${url && !isValidUrl(url) ? 'border-red-500 focus:ring-red-500' : 'admin-border focus:ring-primary-500'} admin-bg admin-text focus:ring-2 outline-none`}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImageField(index)}
+                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 size={20} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={addImageField}
+                                        className="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                                    >
+                                        + Agregar otra imagen
+                                    </button>
+                                </div>
+                                {/* Estado Toggle */}
+                                <div className="space-y-2 mt-6">
+                                    <label className="text-sm font-medium admin-text">Estado del Anuncio</label>
+                                    <div className="flex items-center gap-2">
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="active"
+                                                checked={formData.active}
+                                                onChange={handleChange}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                            <span className="ml-3 text-sm font-medium admin-text">
+                                                {formData.active ? "Activo" : "Inactivo"}
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <p className="text-xs admin-text-muted">Los anuncios inactivos no se mostrarán en la plataforma</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: VARIANTES */}
+                        {activeTab === 'variants' && (
+                            <div>
+                                <VariantsManager
+                                    variants={formData.variants}
+                                    onChange={(newVariants) => setFormData(prev => ({ ...prev, variants: newVariants }))}
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-4 border-t admin-border">
+                            {isEditing && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeleteModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                    disabled={loading}
+                                >
+                                    <Trash2 size={20} />
+                                    <span>Eliminar Anuncio</span>
+                                </button>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className={`flex items-center gap-2 px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 ${!isEditing ? 'ml-auto' : ''}`}
+                            >
+                                <Save size={20} />
+                                <span>{loading ? "Guardando..." : (isEditing ? "Guardar Cambios" : "Crear Anuncio")}</span>
+                            </button>
+                        </div>
+                    </form>
+
+            {/* Modal de confirmación para eliminar */}
+                <ConfirmModal
+                    isOpen={showDeleteModal}
+                    onClose={() => setShowDeleteModal(false)}
+                    onConfirm={handleDelete}
+                    title="Eliminar Anuncio"
+                    message={`¿Estás seguro de que deseas eliminar el anuncio "${ad?.titulo}"? Esta acción no se puede deshacer.`}
+                    confirmText="Sí, eliminar"
+                    cancelText="Cancelar"
+                    variant="danger"
+                />
+        </div>
+    );
+}
+

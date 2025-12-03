@@ -52,14 +52,14 @@ export default function ResidentialHome({ params }) {
 
             <div className="max-w-7xl mx-auto pt-20 md:pt-20 md:flex md:px-4 md:gap-6">
                 {/* Sidebar for Desktop */}
-                <CategorySidebar />
+                <CategorySidebar residentialId={residentialData?.$id} />
 
                 <main className="flex-1 min-w-0">
                     <PromoBanner residentialSlug={residencial} />
 
                     {/* Mobile Category Chips */}
                     <div className="md:hidden">
-                        <CategoryChips />
+                        <CategoryChips residentialId={residentialData?.$id} />
                     </div>
 
                     <ProductGrid

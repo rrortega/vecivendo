@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useTheme } from "@/context/ThemeContext";
 
 // Fix for default marker icon in Next.js
 delete L.Icon.Default.prototype._getIconUrl;
@@ -17,10 +18,36 @@ export default function LocationPicker({ lat, lng, radius, onChange }) {
     const mapInstanceRef = useRef(null);
     const markerRef = useRef(null);
     const circleRef = useRef(null);
+    const tileLayerRef = useRef(null);
+    const { theme } = useTheme();
+    const [resolvedTheme, setResolvedTheme] = useState("light");
 
     // Default to Mexico City if no coords
     const defaultLat = 19.4326;
     const defaultLng = -99.1332;
+
+    useEffect(() => {
+        const updateResolvedTheme = () => {
+            if (theme === "system") {
+                const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                setResolvedTheme(isDark ? "dark" : "light");
+            } else {
+                setResolvedTheme(theme);
+            }
+        };
+
+        updateResolvedTheme();
+
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        const handleChange = () => {
+            if (theme === "system") {
+                updateResolvedTheme();
+            }
+        };
+
+        mediaQuery.addEventListener("change", handleChange);
+        return () => mediaQuery.removeEventListener("change", handleChange);
+    }, [theme]);
 
     useEffect(() => {
         if (!mapRef.current) return;
@@ -30,11 +57,6 @@ export default function LocationPicker({ lat, lng, radius, onChange }) {
             const initialLng = lng || defaultLng;
 
             const map = L.map(mapRef.current).setView([initialLat, initialLng], 15);
-
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            }).addTo(map);
-
             mapInstanceRef.current = map;
 
             // Click handler to move marker
@@ -44,10 +66,29 @@ export default function LocationPicker({ lat, lng, radius, onChange }) {
             });
         }
 
+        // Update tile layer based on theme
+        if (mapInstanceRef.current) {
+            if (tileLayerRef.current) {
+                tileLayerRef.current.remove();
+            }
+
+            const tileUrl = resolvedTheme === "dark"
+                ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+            const attribution = resolvedTheme === "dark"
+                ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+            tileLayerRef.current = L.tileLayer(tileUrl, {
+                attribution: attribution,
+            }).addTo(mapInstanceRef.current);
+        }
+
         // Update marker and circle when props change
         updateMapElements();
 
-    }, []); // Run once on mount to init map
+    }, [resolvedTheme]); // Re-run when theme changes
 
     // Effect to update map elements when props change
     useEffect(() => {
@@ -90,9 +131,6 @@ export default function LocationPicker({ lat, lng, radius, onChange }) {
                 radius: currentRadius,
             }).addTo(map);
         }
-
-        // Center map if it's the first load with valid coords
-        // (Optional logic to avoid jumping around too much)
     };
 
     return <div ref={mapRef} className="w-full h-[500px] rounded-lg z-0" />;

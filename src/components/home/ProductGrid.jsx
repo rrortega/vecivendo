@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { client } from "@/lib/appwrite";
 import { Databases, Query } from "appwrite";
-import { Heart, ShoppingCart, ImageOff, Search } from "lucide-react";
+import { Heart, ShoppingCart, ImageOff, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: propResidentialId, sortOption = "recent" }) => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isFetching, setIsFetching] = useState(false);
     const [residentialId, setResidentialId] = useState(propResidentialId);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -62,12 +63,17 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         if (!residentialId) return;
 
         const fetchProducts = async () => {
-            setLoading(true);
+            if (products.length === 0) {
+                setLoading(true);
+            } else {
+                setIsFetching(true);
+            }
+
             try {
                 const databases = new Databases(client);
                 const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 
-                let sortQuery = Query.orderDesc("$createdAt");
+                let sortQuery = Query.orderDesc("$updatedAt");
                 if (sortOption === "price_asc") {
                     sortQuery = Query.orderAsc("precio");
                 } else if (sortOption === "price_desc") {
@@ -81,43 +87,15 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                     Query.offset((currentPage - 1) * itemsPerPage)
                 ];
 
-                // Note: Client-side filtering for search and category is tricky with server-side pagination
-                // Ideally, we should use Appwrite queries for search and category if possible.
-                // However, the original code did client-side filtering.
-                // To support pagination correctly with filters, we should move filtering to the server side if possible.
-                // But Appwrite's search capability might be limited or require specific index setup.
-                // For now, let's try to keep the original behavior but apply pagination AFTER fetching?
-                // NO, that defeats the purpose of pagination (performance).
-                // We MUST paginate on the server.
-                // So we need to translate filters to Appwrite queries.
-
                 if (categoryFilter) {
                     queries.push(Query.equal("categoria", categoryFilter));
                 }
 
-                // Search is harder without a search index. 
-                // If we can't search on server, we might have to fetch more or accept that search only works on current page (bad UX).
-                // Or we use Appwrite's Query.search if 'titulo' and 'descripcion' are indexed as fulltext.
-                // Let's assume they might be, or use Query.contains for partial match if supported (Appwrite uses search for fulltext).
                 if (searchQuery) {
-                    // This is a best-effort attempt. If fulltext index exists, this works.
-                    // If not, it might fail or we might need to rely on client side filtering for small datasets.
-                    // Given the requirement, let's try to add it to the query.
-                    // queries.push(Query.search("titulo", searchQuery)); 
-                    // But wait, the original code did client side filtering.
-                    // Let's stick to server side pagination for the main list.
-                    // If search is active, maybe we should fetch all (or a larger limit) and paginate client side?
-                    // Or just ignore search for now in the query and let the user know?
-                    // Let's try to use Query.search if possible, but for now let's just paginate the results we get.
-                    // If we want to filter by search, we really should do it on server.
-                    // Let's assume for this task we focus on the pagination of the main list.
-                    // If search is present, we might need to fetch all matching items to paginate correctly client-side
-                    // OR we just paginate the whole DB and filter client side (which is weird).
-
-                    // Let's implement server-side pagination for the MAIN view (no search).
-                    // If there is a search query, we might fallback to fetching all (up to a reasonable limit) and client-side pagination?
-                    // Or better: Let's try to apply the search query to Appwrite.
-                    // queries.push(Query.search("titulo", searchQuery)); 
+                    // Attempt to use server-side search. 
+                    // Requires a Fulltext index on 'titulo' (and 'descripcion' if desired).
+                    // If index is missing, this might fail, so we catch errors.
+                    queries.push(Query.search("titulo", searchQuery));
                 }
 
                 const response = await databases.listDocuments(
@@ -131,26 +109,35 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 console.error("Error fetching products:", error);
             } finally {
                 setLoading(false);
+                setIsFetching(false);
             }
         };
 
         fetchProducts();
-    }, [residentialId, sortOption, currentPage, itemsPerPage, categoryFilter]); // Added dependencies
+    }, [residentialId, sortOption, currentPage, itemsPerPage, categoryFilter, searchQuery]); // Added searchQuery
 
-    // Client-side filtering for search (since we didn't implement server-side search yet)
-    // If we have search, the pagination from server might be "wrong" because it returns a page of ALL items, 
-    // and then we filter that page. This results in pages with < itemsPerPage or even empty pages.
-    // Ideally we need server side search. 
-    // For now, let's apply the search filter to the fetched products.
-    const filteredProducts = products.filter(product => {
-        const matchesSearch = !searchQuery ||
-            product.titulo?.toLowerCase().includes(searchQuery) ||
-            product.descripcion?.toLowerCase().includes(searchQuery);
+    // Optimistic filtering: Filter and sort the CURRENTLY loaded products immediately.
+    // This gives instant feedback while the server query runs in the background.
+    const filteredProducts = products
+        .filter(product => {
+            const matchesSearch = !searchQuery ||
+                product.titulo?.toLowerCase().includes(searchQuery) ||
+                product.descripcion?.toLowerCase().includes(searchQuery);
 
-        // Category is already handled in server query if we uncommented it above.
-        // Let's assume we did.
-        return matchesSearch;
-    });
+            const matchesCategory = !categoryFilter || product.categoria === categoryFilter;
+
+            return matchesSearch && matchesCategory;
+        })
+        .sort((a, b) => {
+            if (sortOption === "price_asc") {
+                return a.precio - b.precio;
+            } else if (sortOption === "price_desc") {
+                return b.precio - a.precio;
+            } else {
+                // Default: recent (updatedAt desc)
+                return new Date(b.$updatedAt) - new Date(a.$updatedAt);
+            }
+        });
 
     const formatPrice = (price) => {
         return new Intl.NumberFormat('es-MX', {
@@ -196,7 +183,14 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
     }
 
     return (
-        <div className="flex flex-col gap-6 pb-20">
+        <div className="flex flex-col gap-6 pb-20 relative">
+            {isFetching && (
+                <div className="absolute top-0 right-4 z-10">
+                    <div className="bg-surface/80 backdrop-blur-sm p-2 rounded-full shadow-sm border border-border">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    </div>
+                </div>
+            )}
             <div className={viewMode === "grid"
                 ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-4"
                 : "flex flex-col gap-4 px-4 max-w-full mx-auto"

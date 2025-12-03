@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { client } from "@/lib/appwrite";
 import { Databases } from "appwrite";
+import { useCategoryStats } from "@/hooks/useCategoryStats";
 import {
     Utensils,
     Car,
@@ -17,6 +18,7 @@ import {
     Sofa
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import * as LucideIcons from "lucide-react";
 
 const CATEGORY_ICONS = {
     "comida": Utensils,
@@ -30,43 +32,26 @@ const CATEGORY_ICONS = {
     "otros": Sparkles
 };
 
-export const CategorySidebar = () => {
-    const [categories, setCategories] = useState([]);
+export const CategorySidebar = ({ residentialId }) => {
+    const { categories } = useCategoryStats(residentialId);
     const router = useRouter();
     const searchParams = useSearchParams();
     const activeCategory = searchParams.get("category");
     const searchQuery = searchParams.get("search") || "";
 
-    useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                const databases = new Databases(client);
-                const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
-
-                const response = await databases.listDocuments(
-                    dbId,
-                    "anuncios",
-                    []
-                );
-
-                const uniqueCategories = [...new Set(response.documents.map(doc => doc.categoria?.trim()))].filter(Boolean);
-                setCategories(uniqueCategories);
-            } catch (error) {
-                console.error("Error fetching categories:", error);
-            }
-        };
-
-        fetchCategories();
-    }, []);
-
-    const handleCategoryClick = (category) => {
+    const handleCategoryClick = (categorySlug) => {
         const params = new URLSearchParams(searchParams);
-        if (activeCategory === category) {
+        if (activeCategory === categorySlug) {
             params.delete("category");
         } else {
-            params.set("category", category);
+            params.set("category", categorySlug);
         }
         router.replace(`?${params.toString()}`);
+    };
+
+    const getIcon = (iconName) => {
+        const Icon = LucideIcons[iconName];
+        return Icon || LucideIcons.Package;
     };
 
     const handleSearchChange = (e) => {
@@ -121,20 +106,30 @@ export const CategorySidebar = () => {
 
                 {/* Category Buttons */}
                 {categories.map((category) => {
-                    const Icon = CATEGORY_ICONS[category.toLowerCase()] || Sparkles;
-                    const isActive = activeCategory === category;
+                    const Icon = getIcon(category.icono);
+                    const isActive = activeCategory === category.slug;
 
                     return (
                         <button
-                            key={category}
-                            onClick={() => handleCategoryClick(category)}
-                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left border border-transparent ${isActive
+                            key={category.$id}
+                            onClick={() => handleCategoryClick(category.slug)}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all text-left border border-transparent ${isActive
                                 ? "bg-primary text-white font-semibold shadow-sm"
                                 : "text-text-secondary hover:border-primary hover:text-text-main"
                                 }`}
                         >
-                            <Icon size={20} />
-                            <span className="text-sm capitalize">{category}</span>
+                            <div className="flex items-center gap-3">
+                                <Icon size={20} />
+                                <span className="text-sm">{category.nombre}</span>
+                            </div>
+                            {category.count > 0 && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${isActive
+                                    ? "bg-white/20 text-white"
+                                    : "bg-surface-hover text-text-secondary"
+                                    }`}>
+                                    {category.count}
+                                </span>
+                            )}
                         </button>
                     );
                 })}

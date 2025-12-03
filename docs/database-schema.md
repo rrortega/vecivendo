@@ -54,7 +54,6 @@ Anuncios/productos publicados en cada residencial.
 - `tipo` (string) - Tipo de anuncio (venta, servicio, etc.)
 - `imagenes` (array[string]) - URLs de imágenes
 - `activo` (boolean, required) - Si el anuncio está activo
-- `fecha_publicacion` (datetime) - Fecha de publicación
 - `mensaje_original_id` (string) - ID del mensaje de WhatsApp original
 - `metadata_ia` (string) - Metadatos generados por IA
 

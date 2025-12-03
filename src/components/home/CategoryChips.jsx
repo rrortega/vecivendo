@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { client } from "@/lib/appwrite";
 import { Databases } from "appwrite";
+import { useCategoryStats } from "@/hooks/useCategoryStats";
 import {
     Utensils,
     Car,
@@ -15,6 +16,7 @@ import {
     Heart
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import * as LucideIcons from "lucide-react";
 
 const CATEGORY_ICONS = {
     "Comida": Utensils,
@@ -29,49 +31,25 @@ const CATEGORY_ICONS = {
     "Otros": Sparkles
 };
 
-export const CategoryChips = () => {
-    const [categories, setCategories] = useState([]);
+export const CategoryChips = ({ residentialId }) => {
+    const { categories } = useCategoryStats(residentialId);
     const router = useRouter();
     const searchParams = useSearchParams();
     const activeCategory = searchParams.get("category");
 
-    useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                const databases = new Databases(client);
-                const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
-
-                // Fetch unique categories from products or a categories collection
-                // For now, let's assume we fetch from 'productos' and aggregate, 
-                // or better, fetch from a 'categorias' collection if it existed.
-                // Since we don't have a dedicated categories collection in the prompt context,
-                // we'll fetch products and extract unique categories.
-                // OPTIMIZATION: In a real app, use a dedicated collection or Appwrite aggregation.
-
-                const response = await databases.listDocuments(
-                    dbId,
-                    "productos",
-                    [] // Fetch all (limit 25 by default)
-                );
-
-                const uniqueCategories = [...new Set(response.documents.map(doc => doc.categoria?.trim()))].filter(Boolean);
-                setCategories(uniqueCategories);
-            } catch (error) {
-                console.error("Error fetching categories:", error);
-            }
-        };
-
-        fetchCategories();
-    }, []);
-
-    const handleCategoryClick = (category) => {
+    const handleCategoryClick = (categorySlug) => {
         const params = new URLSearchParams(searchParams);
-        if (activeCategory === category) {
+        if (activeCategory === categorySlug) {
             params.delete("category");
         } else {
-            params.set("category", category);
+            params.set("category", categorySlug);
         }
         router.replace(`?${params.toString()}`);
+    };
+
+    const getIcon = (iconName) => {
+        const Icon = LucideIcons[iconName];
+        return Icon || LucideIcons.Package;
     };
 
     if (categories.length === 0) return null;
@@ -79,19 +57,28 @@ export const CategoryChips = () => {
     return (
         <div className="flex gap-3 overflow-x-auto pb-4 px-4 scrollbar-hide">
             {categories.map((category) => {
-                const Icon = CATEGORY_ICONS[category] || Sparkles;
-                const isActive = activeCategory === category;
+                const Icon = getIcon(category.icono);
+                const isActive = activeCategory === category.slug;
 
                 return (
                     <button
-                        key={category}
-                        onClick={() => handleCategoryClick(category)}
+                        key={category.$id}
+                        onClick={() => handleCategoryClick(category.slug)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all ${isActive
-                                ? "bg-primary text-white shadow-md transform scale-105"
-                                : "bg-surface border border-border text-text-secondary hover:border-primary/50 hover:text-primary"
+                            ? "bg-primary text-white shadow-md transform scale-105"
+                            : "bg-surface border border-border text-text-secondary hover:border-primary/50 hover:text-primary"
                             }`}
-                    >    <Icon size={16} />
-                        <span className="text-sm font-medium">{category}</span>
+                    >
+                        <Icon size={16} />
+                        <span className="text-sm font-medium">{category.nombre}</span>
+                        {category.count > 0 && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${isActive
+                                ? "bg-white/20 text-white"
+                                : "bg-surface-hover text-text-secondary"
+                                }`}>
+                                {category.count}
+                            </span>
+                        )}
                     </button>
                 );
             })}
