@@ -20,7 +20,8 @@ import {
     Sun,
     Moon,
     LogOut,
-    Tag
+    Tag,
+    FileText
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -29,10 +30,11 @@ const Sidebar = ({ isOpen, onClose }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const navItems = [
-        { name: "Dashboard", href: "/console", icon: LayoutDashboard },
+        { name: "Tablero", href: "/console/dashboard", icon: LayoutDashboard },
         { name: "Residenciales", href: "/console/residentials", icon: Building2 },
         { name: "Anuncios", href: "/console/free-ads", icon: Megaphone },
         { name: "Categorías", href: "/console/categories", icon: Tag },
+        { name: "Contenidos", href: "/console/contents", icon: FileText },
         { name: "Publicidad", href: "/console/ads", icon: TrendingUp },
         { name: "Grupos WhatsApp", href: "/console/whatsapp", icon: MessageCircle },
     ];
