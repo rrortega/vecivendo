@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { databases } from '@/lib/appwrite';
 import { Query } from 'appwrite';
@@ -16,7 +16,7 @@ import { categories } from '@/data/helpData'; // Keep categories static for now 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE;
 const COLLECTION_ID = 'contenidos';
 
-export default function HelpCenterPage() {
+function HelpCenterContent() {
     const searchParams = useSearchParams();
     const initialQuery = searchParams.get('q') || '';
 
@@ -191,5 +191,17 @@ export default function HelpCenterPage() {
             <SupportChannels />
             <Footer />
         </div>
+    );
+}
+
+export default function HelpCenterPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+            </div>
+        }>
+            <HelpCenterContent />
+        </Suspense>
     );
 }
