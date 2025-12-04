@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { Databases, Query, Storage, ID } from "appwrite";
-import { User, Settings, Bell, MapPin, LogOut, Check, Camera, Loader2, ArrowLeft, Moon, Sun, Send, Save, Menu, X, Package, Heart, FileText, Shield, HelpCircle, ShoppingBag, Info } from "lucide-react";
+import { User, Settings, Bell, MapPin, LogOut, Check, Camera, Loader2, ArrowLeft, Moon, Sun, Send, Save, Menu, X, Package, Heart, FileText, Shield, HelpCircle, ShoppingBag, Info, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "@/context/ThemeContext";
@@ -33,6 +33,25 @@ export default function ProfilePage({ params }) {
     const [isUploading, setIsUploading] = React.useState(false);
     const fileInputRef = React.useRef(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+    const searchParams = useSearchParams();
+
+    // Handle auto-update location from prompt
+    React.useEffect(() => {
+        const shouldUpdate = searchParams.get('auto_update_location');
+        const newLat = searchParams.get('lat');
+        const newLng = searchParams.get('lng');
+
+        if (shouldUpdate === 'true' && newLat && newLng) {
+            console.log("Auto-updating location from params:", newLat, newLng);
+            updateUserProfile({
+                lat: parseFloat(newLat),
+                lng: parseFloat(newLng)
+            });
+            // Clean up params
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+        }
+    }, [searchParams, updateUserProfile]);
 
     React.useEffect(() => {
         const fetchResidentialDetails = async () => {
@@ -60,7 +79,8 @@ export default function ProfilePage({ params }) {
                         center: centerLat && centerLng ? { lat: parseFloat(centerLat), lng: parseFloat(centerLng) } : null,
                         radius: parseFloat(radius) || 1000,
                         country: doc.country || 'MX',
-                        phone_prefix: doc.phone_prefix || '52'
+                        phone_prefix: doc.phone_prefix || '52',
+                        portada: doc.portada || null
                     });
                 } else if (residencial === 'demo') {
                     // Fallback for demo if not in DB
@@ -70,7 +90,8 @@ export default function ProfilePage({ params }) {
                         center: { lat: 21.1619, lng: -86.8515 }, // Cancun center
                         radius: 500,
                         country: 'MX',
-                        phone_prefix: '52'
+                        phone_prefix: '52',
+                        portada: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1073&q=80"
                     });
                 }
             } catch (error) {
@@ -236,9 +257,9 @@ export default function ProfilePage({ params }) {
 
     const menuItems = [
         { icon: User, label: "Mis Datos", href: `/${residencial}/perfil`, active: true },
-        { icon: Package, label: "Mis Pedidos", href: `/${residencial}/historial` },
+        { icon: ShoppingBag, label: "Mis Pedidos", href: `/${residencial}/historial` },
         { icon: Heart, label: "Mis Favoritos", href: `/${residencial}/favoritos` },
-        { icon: ShoppingBag, label: "Mis Anuncios", href: `/${residencial}/mis-anuncios` },
+        { icon: Megaphone, label: "Mis Anuncios", href: `/${residencial}/mis-anuncios` },
         { icon: FileText, label: "Términos y Condiciones", href: "/legal/terminos-y-condiciones" },
         { icon: Shield, label: "Política de Privacidad", href: "/legal/politica-de-privacidad" },
         { icon: Info, label: "Quiénes Somos", href: "/legal/sobre-nosotros" },
@@ -326,10 +347,10 @@ export default function ProfilePage({ params }) {
                                     router.push(item.href);
                                 }}
                                 className={`w-full flex items-center lg:justify-center xl:justify-start gap-3 lg:px-2 xl:px-4 py-3 rounded-lg transition-colors group ${item.active
-                                        ? "bg-primary/10 text-primary border border-primary"
-                                        : isDisabled
-                                            ? "text-text-secondary/50 cursor-not-allowed border border-transparent"
-                                            : "text-text-secondary hover:bg-surface-hover hover:text-text-main border border-transparent hover:border-border"
+                                    ? "bg-primary/10 text-primary border border-primary"
+                                    : isDisabled
+                                        ? "text-text-secondary/50 cursor-not-allowed border border-transparent"
+                                        : "text-text-secondary hover:bg-surface-hover hover:text-text-main border border-transparent hover:border-border"
                                     }`}
                                 title={item.label}
                                 disabled={isDisabled}
@@ -343,6 +364,26 @@ export default function ProfilePage({ params }) {
             </aside>
 
             <div className="max-w-2xl mx-auto pt-20 md:pt-20 px-4 md:px-6">
+                {/* Residential Cover */}
+                {residentialData?.portada && (
+                    <div className="w-full h-48 md:h-64 rounded-2xl overflow-hidden mb-6 shadow-sm border border-border relative group">
+                        <img
+                            src={residentialData.portada}
+                            alt={`Portada ${residentialName}`}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                        <div className="absolute bottom-4 left-4 right-4 text-white">
+                            <h2 className="text-2xl md:text-3xl font-bold drop-shadow-md">{residentialName}</h2>
+                            {residentialData.city && (
+                                <p className="text-white/90 text-sm flex items-center gap-1 mt-1">
+                                    <MapPin size={14} />
+                                    {residentialData.city}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
                 {/* Profile Header */}
                 <div className="bg-surface rounded-2xl p-6 mb-6 border border-border">
                     <div className="flex items-center gap-4">

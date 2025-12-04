@@ -13,28 +13,28 @@ export default function KPICard({
     currency = 'USD'
 }) {
     const getTrendIcon = () => {
-        if (!change) return <Minus className="w-4 h-4" />;
+        if (!change) return <Minus className="w-3 h-3" />;
 
         switch (change.trend) {
             case 'up':
-                return <ArrowUp className="w-4 h-4" />;
+                return <ArrowUp className="w-3 h-3" />;
             case 'down':
-                return <ArrowDown className="w-4 h-4" />;
+                return <ArrowDown className="w-3 h-3" />;
             default:
-                return <Minus className="w-4 h-4" />;
+                return <Minus className="w-3 h-3" />;
         }
     };
 
     const getTrendColor = () => {
-        if (!change) return 'text-gray-500';
+        if (!change) return 'bg-surface text-gray-400';
 
         switch (change.trend) {
             case 'up':
-                return 'text-green-600 dark:text-green-400';
+                return 'bg-green-900/20 text-green-400';
             case 'down':
-                return 'text-red-600 dark:text-red-400';
+                return 'bg-red-900/20 text-red-400';
             default:
-                return 'text-gray-500 dark:text-gray-400';
+                return 'g-gray-700 text-gray-400';
         }
     };
 
@@ -53,39 +53,27 @@ export default function KPICard({
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow dark:border dark:border-gray-700">
+        <div className="bg-surface rounded-2xl shadow-sm border border-gray-900/20 p-6 hover:shadow-md transition-all duration-300 group">
             <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        {title}
-                    </p>
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 transition-colors">
+                    {Icon && <Icon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />}
                 </div>
-                {Icon && (
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                {change && (
+                    <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${getTrendColor()}`}>
+                        {getTrendIcon()}
+                        <span>{formatPercentage(change.percentage, 1)}</span>
                     </div>
                 )}
             </div>
 
-            <div className="mb-2">
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {formatValue(value)}
+            <div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    {title}
                 </p>
+                <h3 className="text-3xl font-bold  tracking-tight">
+                    {formatValue(value)}
+                </h3>
             </div>
-
-            {change && (
-                <div className="flex items-center gap-2">
-                    <div className={`flex items-center gap-1 ${getTrendColor()}`}>
-                        {getTrendIcon()}
-                        <span className="text-sm font-medium">
-                            {formatPercentage(change.percentage, 1)}
-                        </span>
-                    </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                        vs período anterior
-                    </span>
-                </div>
-            )}
         </div>
     );
 }

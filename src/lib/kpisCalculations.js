@@ -68,6 +68,9 @@ export function calculateAdKPIs(anuncios, previousAnuncios) {
     const activeAds = anuncios.filter(ad => ad.activo);
     const previousActiveAds = previousAnuncios.filter(ad => ad.activo);
 
+    const inactiveAds = anuncios.filter(ad => !ad.activo);
+    const previousInactiveAds = previousAnuncios.filter(ad => !ad.activo);
+
     // Anuncios por categoría
     const adsByCategory = anuncios.reduce((acc, ad) => {
         const category = ad.categoria || 'Sin categoría';
@@ -96,6 +99,8 @@ export function calculateAdKPIs(anuncios, previousAnuncios) {
         totalActive: activeAds.length,
         totalActivePrevious: previousActiveAds.length,
         totalActiveChange: calculateChange(activeAds.length, previousActiveAds.length),
+        totalInactive: inactiveAds.length,
+        totalInactiveChange: calculateChange(inactiveAds.length, previousInactiveAds.length),
         adsByCategory,
         adsByResidential,
         expiringAds: expiringAds.length,

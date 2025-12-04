@@ -12,6 +12,24 @@ import { useTheme } from "@/context/ThemeContext";
 
 const MOCK_RESIDENTIALS = [];
 
+// Helper to get flag emoji
+const getCountryFlag = (country) => {
+  if (!country) return "🏳️";
+  // Try 2-letter code
+  if (country.length === 2) {
+    return country.toUpperCase().replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+  }
+  // Common names mapping
+  const map = {
+    "mexico": "🇲🇽", "méxico": "🇲🇽",
+    "espana": "🇪🇸", "españa": "🇪🇸",
+    "colombia": "🇨🇴", "argentina": "🇦🇷",
+    "peru": "🇵🇪", "perú": "🇵🇪", "chile": "🇨🇱",
+    "venezuela": "🇻🇪", "ecuador": "🇪🇨"
+  };
+  return map[country.toLowerCase()] || "🏳️";
+};
+
 function LandingPageContent() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -62,7 +80,10 @@ function LandingPageContent() {
             ...doc,
             name: doc.nombre,
             address: doc.direccion || "Ubicación Registrada",
-            image: doc.imagen_url || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80"
+            city: doc.ciudad,
+            province: doc.provincia_estado,
+            country: doc.country,
+            image: doc.portada || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80"
           }));
           console.log('Mapped residentials:', mapped);
           setResidentials(mapped);
@@ -103,6 +124,23 @@ function LandingPageContent() {
     fetchResidentials();
     fetchContentAndConfig();
   }, []);
+
+  // Handle access_denied redirect
+  useEffect(() => {
+    const deniedSlug = searchParams.get("access_denied");
+    const reason = searchParams.get("reason");
+
+    if (deniedSlug && residentials.length > 0) {
+      const targetRes = residentials.find(r => r.slug === deniedSlug);
+      if (targetRes) {
+        setSelectedResidential(targetRes);
+        setIsModalOpen(true);
+
+        // Optional: You could show a toast here explaining why
+        // e.g. "Tu sesión ha expirado o estás fuera del perímetro."
+      }
+    }
+  }, [searchParams, residentials]);
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -248,9 +286,9 @@ function LandingPageContent() {
                   <div className="p-5 flex flex-col flex-1 justify-center">
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-text-main mb-1">{res.name}</h3>
-                      <p className="text-sm text-text-secondary mb-4 flex items-center gap-1">
-                        <MapPin size={14} />
-                        {res.address}
+                      <p className="text-sm text-text-secondary mb-4 flex items-center gap-2">
+                        <span className="text-lg" title={res.country}>{getCountryFlag(res.country)}</span>
+                        <span>{res.address}, {res.city}, {res.province}</span>
                       </p>
                     </div>
                     <div className={`${(viewMode === "list" || displayedResidentials.length === 1) ? "md:self-end md:w-auto w-full" : "mt-auto"}`}>

@@ -1,212 +1,227 @@
-# Estructura de Base de Datos Optimizada - Vecivendo
+# Estructura de Base de Datos - Vecivendo
 
-## 📊 Esquema de Relaciones
+Documentación actualizada automáticamente basada en la estructura real de Appwrite.
 
-### 1. **residenciales** (Colección Principal)
+## 📊 Colecciones y Esquemas
+
+### 1. **residenciales**
 Representa cada comunidad/residencial registrado en la plataforma.
 
 **Atributos:**
-- `nombre` (string, required) - Nombre del residencial
-- `slug` (string, required, unique) - URL-friendly identifier
-- `direccion` (string) - Dirección física
-- `imagen_url` (string) - URL de la imagen del residencial
-- `descripcion` (string) - Descripción del residencial
-- `activo` (boolean) - Si el residencial está activo
+- `nombre` (string, required)
+- `slug` (string, required)
+- `direccion` (string, required)
+- `ciudad` (string)
+- `provincia_estado` (string, required)
+- `codigo_postal` (string)
+- `country` (string, required)
+- `moneda` (string)
+- `phone_prefix` (string)
+- `descripcion` (string)
+- `activo` (boolean)
+- `portada` (url) - Imagen de portada del residencial
 
 **Relaciones:**
-- `anuncios` (One-to-Many) ← anuncios.residencial
-- `grupos_whatsapp` (One-to-Many) ← grupos_whatsapp.residencial
-- `avisos_comunidad` (One-to-Many) ← avisos_comunidad.residencial
-- `anuncios_pago` (Many-to-Many) ↔ anuncios_pago.residenciales
+- Referenciado por: `anuncios`, `grupos_whatsapp`, `avisos_comunidad`, `anunciantes`, `contenidos`
 
 ---
 
-### 2. **grupos_whatsapp** (Nueva Colección)
-Grupos de WhatsApp asociados a cada residencial.
+### 2. **anuncios**
+Anuncios gratuitos publicados en los residenciales.
 
 **Atributos:**
-- `nombre_grupo` (string, required) - Nombre del grupo de WhatsApp
-- `whatsapp_group_id` (string) - ID del grupo en WhatsApp
-- `descripcion` (string) - Descripción del propósito del grupo
-- `activo` (boolean, default: true) - Si el grupo está activo
-- `fecha_vinculacion` (datetime) - Cuándo se vinculó el grupo
-- `numero_miembros` (integer) - Cantidad de miembros en el grupo
+- `titulo` (string, required)
+- `descripcion` (string, size: 5000)
+- `precio` (double)
+- `moneda` (string)
+- `categoria` (string) - Array de etiquetas/categorías
+- `tipo` (string) - 'venta', 'servicio', etc.
+- `imagenes` (string[]) - Array de URLs de imágenes
+- `activo` (boolean)
+- `destacado` (boolean)
+- `fecha_publicacion` (datetime)
+- `dias_vigencia` (integer)
+- `vistas` (integer)
+- `clics` (integer)
+- `contactos` (integer)
+- `mensaje_original_id` (string)
+- `metadata_ia` (string, size: 5000)
+- `telefono_contacto` (string)
 
 **Relaciones:**
-- `residencial` (Many-to-One) → residenciales
-
-**Casos de Uso:**
-- Un residencial puede tener múltiples grupos (ventas, avisos, emergencias, etc.)
-- Los anuncios pueden originarse de mensajes de estos grupos
-- Permite rastrear de qué grupo vino cada anuncio
+- `residencial_id` (Many-to-One) → residenciales
+- `anunciante_id` (Many-to-One) → anunciantes
+- `grupo_origen_id` (Many-to-One) → grupos_whatsapp
 
 ---
 
-### 3. **anuncios** (Colección de Anuncios)
-Anuncios/productos publicados en cada residencial.
+### 3. **anuncios_pago**
+Anuncios pagados/promocionales.
 
 **Atributos:**
-- `titulo` (string, required) - Título del anuncio
-- `descripcion` (string) - Descripción detallada
-- `precio` (double) - Precio del producto/servicio
-- `moneda` (string) - Código de moneda (MXN, USD, etc.)
-- `categoria` (string) - Categoría del producto
-- `tipo` (string) - Tipo de anuncio (venta, servicio, etc.)
-- `imagenes` (array[string]) - URLs de imágenes
-- `activo` (boolean, required) - Si el anuncio está activo
-- `mensaje_original_id` (string) - ID del mensaje de WhatsApp original
-- `metadata_ia` (string) - Metadatos generados por IA
-
-**Relaciones:**
-- `residencial` (Many-to-One) → residenciales
-- `anunciante` (Many-to-One) → usuarios (cuando se implemente)
-- `grupo_origen` (Many-to-One) → grupos_whatsapp (opcional)
-
----
-
-### 4. **avisos_comunidad** (Avisos/Alertas)
-Avisos importantes para la comunidad.
-
-**Atributos:**
-- `titulo` (string, required) - Título del aviso
-- `descripcion` (string) - Descripción del aviso
-- `nivel` (enum: info, warning, critical) - Nivel de importancia
-- `fecha_inicio` (datetime) - Cuándo comienza a mostrarse
-- `fecha_fin` (datetime) - Cuándo deja de mostrarse
-- `activo` (boolean) - Si el aviso está activo
-
-**Relaciones:**
-- `residencial` (Many-to-One) → residenciales
-
----
-
-### 5. **anuncios_pago** (Anuncios Promocionales)
-Banners y anuncios pagados que se muestran en la plataforma.
-
-**Atributos:**
-- `titulo` (string, required) - Título del anuncio
-- `descripcion` (string) - Descripción
-- `imagen_url` (string) - URL de la imagen del banner
-- `enlace_destino` (string) - URL a donde redirige
-- `fecha_inicio` (datetime) - Inicio de la campaña
-- `fecha_fin` (datetime) - Fin de la campaña
-- `activo` (boolean) - Si está activo
-- `prioridad` (integer) - Orden de visualización
+- `titulo` (string, required)
+- `descripcion` (string, size: 1000)
+- `imagen_url` (url, required)
+- `enlace_destino` (url)
+- `fecha_inicio` (datetime, required)
+- `fecha_fin` (datetime, required)
+- `activo` (boolean)
+- `prioridad` (integer)
+- `ubicacion` (string) - 'home', 'sidebar', etc.
+- `tipo_publicidad` (string)
+- `clicks` (integer)
+- `impresiones` (integer)
+- `inversion` (double)
+- `estado_pago` (string)
 
 **Relaciones:**
 - `residenciales` (Many-to-Many) ↔ residenciales
-  - Permite que un anuncio se muestre en múltiples residenciales
+- `cliente_id` (Many-to-One) → anunciantes
 
 ---
 
-### 6. **usuarios** (Futura Implementación)
-Usuarios registrados en la plataforma.
+### 4. **grupos_whatsapp**
+Grupos de WhatsApp vinculados a residenciales.
 
-**Atributos Propuestos:**
-- `nombre` (string, required)
-- `email` (string, required, unique)
-- `telefono` (string)
-- `whatsapp` (string)
-- `avatar_url` (string)
-- `verificado` (boolean)
+**Atributos:**
+- `nombre_grupo` (string, required)
+- `whatsapp_group_id` (string, required)
+- `link_invitacion` (url)
+- `descripcion` (string)
+- `activo` (boolean)
+- `fecha_vinculacion` (datetime)
+- `numero_miembros` (integer)
+- `reglas` (string, size: 2000)
+- `tipo_grupo` (string)
 
-**Relaciones Propuestas:**
-- `mis_anuncios` (One-to-Many) ← anuncios.anunciante
-- `residencial_principal` (Many-to-One) → residenciales
-- `residenciales_acceso` (Many-to-Many) ↔ residenciales
-
----
-
-## 🔄 Flujo de Datos: WhatsApp → Plataforma
-
-### Proceso de Importación de Anuncios desde WhatsApp:
-
-1. **Webhook/Bot recibe mensaje** del grupo de WhatsApp
-2. **Identifica el grupo** mediante `whatsapp_group_id`
-3. **Obtiene el residencial** asociado al grupo
-4. **Procesa el mensaje** con IA para extraer:
-   - Título
-   - Descripción
-   - Precio
-   - Categoría
-   - Imágenes
-5. **Crea el anuncio** en la colección `anuncios`:
-   - Vincula con `residencial`
-   - Vincula con `grupo_origen`
-   - Guarda `mensaje_original_id`
-   - Almacena `metadata_ia`
-
-### Ventajas de esta Estructura:
-
-✅ **Trazabilidad**: Cada anuncio sabe de qué grupo vino
-✅ **Escalabilidad**: Un residencial puede tener múltiples grupos
-✅ **Flexibilidad**: Diferentes grupos para diferentes propósitos
-✅ **Análisis**: Métricas por grupo (qué grupo genera más anuncios)
-✅ **Moderación**: Activar/desactivar grupos específicos
+**Relaciones:**
+- `residencial_id` (Many-to-One) → residenciales
 
 ---
 
-## 📝 Queries Comunes
+### 5. **avisos_comunidad**
+Avisos importantes para los residentes.
 
-### Obtener todos los grupos de un residencial:
-```javascript
-const grupos = await databases.listDocuments(
-    dbId,
-    "grupos_whatsapp",
-    [Query.equal("residencial", residencialId)]
-);
-```
+**Atributos:**
+- `titulo` (string, required)
+- `descripcion` (string, size: 2000)
+- `nivel` (string) - 'info', 'alerta', 'urgente'
+- `fecha_inicio` (datetime)
+- `fecha_fin` (datetime)
+- `activo` (boolean)
+- `alcance` (string)
 
-### Obtener anuncios de un grupo específico:
-```javascript
-const anuncios = await databases.listDocuments(
-    dbId,
-    "anuncios",
-    [
-        Query.equal("grupo_origen", grupoId),
-        Query.equal("activo", true)
-    ]
-);
-```
-
-### Obtener todos los anuncios de un residencial:
-```javascript
-const anuncios = await databases.listDocuments(
-    dbId,
-    "anuncios",
-    [
-        Query.equal("residencial", residencialId),
-        Query.equal("activo", true)
-    ]
-);
-```
+**Relaciones:**
+- `residencial_id` (Many-to-One) → residenciales
 
 ---
 
-## 🚀 Próximos Pasos
+### 6. **anunciantes**
+Usuarios o entidades que publican anuncios.
 
-1. ✅ Crear colección `grupos_whatsapp`
-2. ✅ Establecer relación con `residenciales`
-3. ⏳ Agregar campo `grupo_origen` a `anuncios`
-4. ⏳ Implementar webhook para WhatsApp
-5. ⏳ Crear panel de administración de grupos
-6. ⏳ Implementar colección `usuarios`
-7. ⏳ Sistema de autenticación y permisos
+**Atributos:**
+- `nombre_anunciante` (string)
+- `telefono_whatsapp` (string, required)
+- `email` (email)
+- `ultima_actividad` (datetime)
+- `estado` (string)
+- `notas` (string)
+
+**Relaciones:**
+- `residencial_id` (Many-to-One) → residenciales
 
 ---
 
-## 📊 Diagrama de Relaciones
+### 7. **contenidos**
+Artículos, noticias y páginas estáticas (CMS).
 
-```
-residenciales (1) ──────────── (N) grupos_whatsapp
-     │                              │
-     │                              │ (opcional)
-     │                              │
-     └──────── (N) anuncios ────────┘
-                   │
-                   └──────── (N) usuarios (futuro)
+**Atributos:**
+- `titulo` (string, required)
+- `slug` (string, required)
+- `contenido` (string, size: 10000) - Markdown
+- `extracto` (string, size: 500)
+- `tipo` (string) - 'articulo', 'pagina', 'noticia'
+- `categoria` (string)
+- `estado` (string) - 'borrador', 'publicado'
+- `imagen_destacada` (url)
+- `tags` (string[])
+- `fecha_publicacion` (datetime)
+- `autor_nombre` (string)
 
-residenciales (N) ←──────→ (N) anuncios_pago
+**Relaciones:**
+- `residencial_id` (Many-to-One) → residenciales (opcional, null = global)
 
-residenciales (1) ──────────── (N) avisos_comunidad
-```
+---
+
+### 8. **mensajes_whatsapp**
+Registro de mensajes procesados desde WhatsApp.
+
+**Atributos:**
+- `whatsapp_message_id` (string, required)
+- `telefono_remitente` (string)
+- `texto` (string, size: 2000)
+- `adjuntos` (string, size: 5000) - JSON string
+- `fecha_mensaje` (datetime)
+- `procesado` (boolean)
+- `error_proceso` (string)
+
+**Relaciones:**
+- `grupo_id` (Many-to-One) → grupos_whatsapp
+- `anuncio_id` (One-to-One) → anuncios (si generó un anuncio)
+
+---
+
+### 9. **reviews**
+Reseñas y calificaciones de anuncios.
+
+**Atributos:**
+- `rating` (integer, required) - 1 a 5
+- `comentario` (string, size: 1000)
+- `autor_nombre` (string, required)
+- `fecha` (datetime)
+- `estado` (string) - 'pendiente', 'aprobado'
+
+**Relaciones:**
+- `anuncio_id` (Many-to-One) → anuncios
+
+---
+
+### 10. **logs**
+Registro de eventos y analíticas.
+
+**Atributos:**
+- `event_type` (string, required) - 'view', 'click', 'print'
+- `ad_type` (string, required) - 'free', 'paid'
+- `timestamp` (datetime)
+- `ip_address` (string)
+- `user_agent` (string)
+- `metadata` (string, size: 2000) - JSON string
+
+**Relaciones:**
+- `ad_id` (string) - ID del anuncio (polimórfico: anuncios o anuncios_pago)
+- `user_id` (string) - ID del usuario (si aplica)
+
+---
+
+### 11. **pedidos**
+Registro de pedidos o intenciones de compra.
+
+**Atributos:**
+- `cantidad` (integer)
+- `total` (double)
+- `estado` (string)
+- `fecha_pedido` (datetime)
+- `notas` (string)
+- `datos_contacto` (string)
+
+**Relaciones:**
+- `anuncio_id` (Many-to-One) → anuncios
+- `comprador_id` (Many-to-One) → anunciantes (opcional)
+
+---
+
+## 📝 Notas Adicionales
+
+- Todos los documentos incluyen automáticamente los campos de sistema: `$id`, `$createdAt`, `$updatedAt`, `$permissions`.
+- Las fechas se manejan en formato ISO 8601.
+- Los campos de tipo `relationship` en Appwrite manejan la integridad referencial.

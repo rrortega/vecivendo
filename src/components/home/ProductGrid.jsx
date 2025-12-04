@@ -183,7 +183,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
     }
 
     return (
-        <div className="flex flex-col gap-6 pb-20 relative">
+        <div className="flex flex-col gap-6 pb-32 relative">
             {isFetching && (
                 <div className="absolute top-0 right-4 z-10">
                     <div className="bg-surface/80 backdrop-blur-sm p-2 rounded-full shadow-sm border border-border">
@@ -193,7 +193,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
             )}
             <div className={viewMode === "grid"
                 ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-4"
-                : "flex flex-col gap-4 px-4 max-w-full mx-auto"
+                : "flex flex-col gap-4 px-4 w-full"
             }>
                 {filteredProducts.map((product) => (
                     <Link
@@ -263,45 +263,47 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
             </div>
 
             {/* Pagination Controls */}
-            {totalItems > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between px-4 gap-4 mt-4">
-                    <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        <span>Mostrar:</span>
-                        <select
-                            value={itemsPerPage}
-                            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                            className="bg-surface border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                        >
-                            <option value={10}>10</option>
-                            <option value={20}>20</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                        </select>
-                        <span>por página</span>
-                    </div>
+            {totalItems > 0 && totalPages > 1 && (
+                <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-border p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                    <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 text-sm text-text-secondary">
+                            <span>Mostrar:</span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                className="bg-surface border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                            >
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                            <span>por página</span>
+                        </div>
 
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="h-8 px-3"
-                        >
-                            Anterior
-                        </Button>
-                        <span className="text-sm text-text-secondary">
-                            Página {currentPage} de {totalPages}
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="h-8 px-3"
-                        >
-                            Siguiente
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="h-8 px-3"
+                            >
+                                Anterior
+                            </Button>
+                            <span className="text-sm text-text-secondary">
+                                Página {currentPage} de {totalPages}
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="h-8 px-3"
+                            >
+                                Siguiente
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

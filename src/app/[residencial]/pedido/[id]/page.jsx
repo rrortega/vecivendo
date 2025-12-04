@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Loader2, MessageCircle, CheckCircle2, Package } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle, CheckCircle2, Package, X, AlertCircle, Edit, Star } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 import { client } from "@/lib/appwrite";
@@ -17,6 +17,14 @@ export default function OrderDetailsPage({ params }) {
     const [isLoading, setIsLoading] = useState(true);
     const [isSendingMessage, setIsSendingMessage] = useState(false);
     const [hasAutoOpened, setHasAutoOpened] = useState(false);
+    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+    // Review State
+    const [reviewRating, setReviewRating] = useState(0);
+    const [reviewComment, setReviewComment] = useState("");
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+    const [hasReviewed, setHasReviewed] = useState(false);
 
     useEffect(() => {
         fetchOrderDetails();
@@ -151,6 +159,74 @@ Este pedido lo he generado por medio de VeciVendo y el número de pedido es ${or
         }
     };
 
+    const handleUpdateStatus = async (newStatus) => {
+        if (!order) return;
+        setIsUpdatingStatus(true);
+        try {
+            const databases = new Databases(client);
+            const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+
+            await databases.updateDocument(
+                dbId,
+                "pedidos",
+                order.$id,
+                {
+                    estado: newStatus
+                }
+            );
+
+            showToast(`Pedido marcado como ${newStatus}`, "success");
+            setIsStatusModalOpen(false);
+            fetchOrderDetails(); // Refresh data
+        } catch (error) {
+            console.error("Error updating status:", error);
+            showToast("Error al actualizar el estado", "error");
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
+    const handleSubmitReview = async () => {
+        if (reviewRating === 0) {
+            showToast("Por favor selecciona una calificación", "error");
+            return;
+        }
+
+        setIsSubmittingReview(true);
+        try {
+            const databases = new Databases(client);
+            const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+
+            // Get ad ID from first item
+            const items = JSON.parse(order.items || "[]");
+            if (items.length === 0) {
+                showToast("No se pudo identificar el anuncio", "error");
+                return;
+            }
+            const anuncioId = items[0].id;
+
+            await databases.createDocument(
+                dbId,
+                "reviews",
+                "unique()",
+                {
+                    anuncio_id: anuncioId,
+                    puntuacion: reviewRating,
+                    comentario: reviewComment,
+                    autor_nombre: order.comprador_nombre || "Anónimo"
+                }
+            );
+
+            showToast("¡Gracias por tu reseña!", "success");
+            setHasReviewed(true);
+        } catch (error) {
+            console.error("Error submitting review:", error);
+            showToast("Error al enviar la reseña", "error");
+        } finally {
+            setIsSubmittingReview(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -209,36 +285,157 @@ Este pedido lo he generado por medio de VeciVendo y el número de pedido es ${or
             </header>
 
             <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-                {/* Order Status Card */}
+                {/* Header Info Card */}
                 <div className="bg-surface rounded-xl border border-border p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-primary/10 p-3 rounded-full">
-                                <Package className="text-primary" size={24} />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-semibold text-text-main">Estado del Pedido</h2>
-                                <p className="text-sm text-text-secondary">Creado el {new Date(order.$createdAt).toLocaleDateString('es-MX', {
+                    <div className="flex items-center gap-3">
+                        <div className="bg-primary/10 p-3 rounded-full">
+                            <Package className="text-primary" size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-text-main">Pedido #{order.numero_pedido}</h2>
+                            <p className="text-sm text-text-secondary">
+                                Realizado el {new Date(order.$createdAt).toLocaleDateString('es-MX', {
                                     year: 'numeric',
                                     month: 'long',
                                     day: 'numeric',
                                     hour: '2-digit',
                                     minute: '2-digit'
-                                })}</p>
-                            </div>
+                                })}
+                            </p>
                         </div>
-                        <span className={`px-4 py-2 rounded-full text-sm font-medium ${getEstadoColor(order.estado)}`}>
-                            {getEstadoLabel(order.estado)}
-                        </span>
+                    </div>
+                </div>
+
+                {/* Order Timeline & Status */}
+                <div className="bg-surface rounded-xl border border-border p-6 border shadow-sm">
+                    <h3 className="text-lg font-semibold text-text-main mb-6">Progreso del Pedido</h3>
+
+                    {/* Timeline */}
+                    <div className="relative flex justify-between items-start mb-8">
+                        {/* Connecting Line - Aligned with circles (h-8 -> center at h-4/top-4) */}
+                        <div className="absolute top-4 left-0 w-full h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
+                        <div
+                            className="absolute top-4 left-0 h-1 bg-primary -translate-y-1/2 z-0 transition-all duration-500"
+                            style={{
+                                width: order.estado === 'completado' || order.estado === 'cancelado' ? '100%' :
+                                    order.estado === 'pendiente' || order.estado === 'confirmado' || order.estado === 'en_proceso' ? '50%' : '0%'
+                            }}
+                        ></div>
+
+                        {/* Step 1: Ordenado */}
+                        <div className="relative z-10 flex flex-col items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center shadow-sm">
+                                <CheckCircle2 size={16} />
+                            </div>
+                            <span className="text-xs font-medium text-text-main">Ordenado</span>
+                        </div>
+
+                        {/* Step 2: Pendiente */}
+                        <div className="relative z-10 flex flex-col items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-colors ${['pendiente', 'confirmado', 'en_proceso', 'completado', 'cancelado'].includes(order.estado)
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-200 text-gray-400'
+                                }`}>
+                                {['completado', 'cancelado'].includes(order.estado) ? <CheckCircle2 size={16} /> : <span className="text-xs font-bold">2</span>}
+                            </div>
+                            <span className="text-xs font-medium text-text-main">Pendiente</span>
+                        </div>
+
+                        {/* Step 3: Finalizado */}
+                        <div className="relative z-10 flex flex-col items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-colors ${['completado', 'cancelado'].includes(order.estado)
+                                ? (order.estado === 'cancelado' ? 'bg-red-500 text-white' : 'bg-primary text-white')
+                                : 'bg-gray-200 text-gray-400'
+                                }`}>
+                                {order.estado === 'completado' ? <CheckCircle2 size={16} /> :
+                                    order.estado === 'cancelado' ? <X size={16} /> :
+                                        <span className="text-xs font-bold">3</span>}
+                            </div>
+                            <span className="text-xs font-medium text-text-main">
+                                {order.estado === 'cancelado' ? 'Cancelado' : 'Completado'}
+                            </span>
+                        </div>
                     </div>
 
-                    {order.mensaje_enviado && (
-                        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                            <CheckCircle2 size={16} />
-                            <span>Mensaje enviado al anunciante</span>
-                        </div>
-                    )}
+                    {/* Status Action Button */}
+                    <div className="flex justify-center border-t border-border pt-6">
+                        {order.estado === 'pendiente' ? (
+                            <button
+                                onClick={() => setIsStatusModalOpen(true)}
+                                className={`px-6 py-2.5 rounded-full text-sm font-medium ${getEstadoColor(order.estado)} hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md`}
+                            >
+                                {getEstadoLabel(order.estado)}
+                                <Edit size={16} />
+                            </button>
+                        ) : (
+                            <div className={`px-6 py-2 rounded-full text-sm font-medium ${getEstadoColor(order.estado)} flex items-center gap-2`}>
+                                {order.estado === 'completado' && <CheckCircle2 size={16} />}
+                                {order.estado === 'cancelado' && <X size={16} />}
+                                {getEstadoLabel(order.estado)}
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {/* Review Section (Only if Completed) */}
+                {order.estado === 'completado' && !hasReviewed && (
+                    <div className="bg-surface rounded-xl border border-border p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <h3 className="text-lg font-semibold text-text-main mb-2">Califica el servicio</h3>
+                        <p className="text-sm text-text-secondary mb-4">Ayuda a otros vecinos contando tu experiencia.</p>
+
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-center gap-2 py-2">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                        key={star}
+                                        onClick={() => setReviewRating(star)}
+                                        className="focus:outline-none transition-transform hover:scale-110"
+                                    >
+                                        <Star
+                                            size={32}
+                                            className={`${star <= reviewRating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} transition-colors`}
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+
+                            <textarea
+                                className="w-full p-3 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+                                placeholder="Escribe un comentario (opcional)..."
+                                rows={3}
+                                value={reviewComment}
+                                onChange={(e) => setReviewComment(e.target.value)}
+                            />
+
+                            <Button
+                                onClick={handleSubmitReview}
+                                disabled={isSubmittingReview || reviewRating === 0}
+                                className="w-full"
+                            >
+                                {isSubmittingReview ? (
+                                    <>
+                                        <Loader2 className="animate-spin mr-2" size={18} />
+                                        Enviando...
+                                    </>
+                                ) : (
+                                    "Enviar Calificación"
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Review Success Message */}
+                {hasReviewed && (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900 rounded-xl p-6 text-center animate-in zoom-in-95">
+                        <div className="w-12 h-12 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <Star className="text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" size={24} />
+                        </div>
+                        <h3 className="text-lg font-semibold text-green-800 dark:text-green-300">¡Gracias por tu opinión!</h3>
+                        <p className="text-green-600 dark:text-green-400 text-sm">Tu reseña ayuda a mejorar la comunidad.</p>
+                    </div>
+                )}
+
 
                 {/* Items Card */}
                 <div className="bg-surface rounded-xl border border-border p-6">
@@ -291,29 +488,76 @@ Este pedido lo he generado por medio de VeciVendo y el número de pedido es ${or
                 </div>
 
                 {/* Contact Advertiser Button */}
-                <div className="sticky bottom-0 bg-background/80 backdrop-blur-md p-4 border-t border-border">
-                    <Button
-                        className="w-full rounded-xl bg-[#25D366] text-white shadow-lg shadow-green-200/50 dark:shadow-none flex items-center justify-center gap-2 py-6 text-lg border border-transparent hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={handleContactAdvertiser}
-                        disabled={isSendingMessage}
-                    >
-                        {isSendingMessage ? (
-                            <>
-                                <Loader2 className="animate-spin" size={24} />
-                                Generando mensaje...
-                            </>
-                        ) : (
-                            <>
-                                <MessageCircle size={24} />
-                                Comunicar con el Anunciante
-                            </>
-                        )}
-                    </Button>
-                    <p className="text-xs text-center text-text-secondary mt-2">
-                        Se abrirá WhatsApp con un mensaje pre-llenado
-                    </p>
-                </div>
+                {!['completado', 'cancelado'].includes(order.estado) && (
+                    <div className="sticky bottom-0 bg-background/80 backdrop-blur-md p-4 border-t border-border">
+                        <Button
+                            className="w-full rounded-xl bg-[#25D366] text-white shadow-lg shadow-green-200/50 dark:shadow-none flex items-center justify-center gap-2 py-6 text-lg border border-transparent hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={handleContactAdvertiser}
+                            disabled={isSendingMessage}
+                        >
+                            {isSendingMessage ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={24} />
+                                    Generando mensaje...
+                                </>
+                            ) : (
+                                <>
+                                    <MessageCircle size={24} />
+                                    Comunicar con el Anunciante
+                                </>
+                            )}
+                        </Button>
+                        <p className="text-xs text-center text-text-secondary mt-2">
+                            Se abrirá WhatsApp con un mensaje pre-llenado
+                        </p>
+                    </div>
+                )}
             </main>
-        </div>
+
+            {/* Status Change Modal */}
+            {
+                isStatusModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-surface w-full max-w-md rounded-2xl shadow-xl border border-border flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
+                            <div className="p-4 border-b border-border flex justify-between items-center">
+                                <h3 className="font-semibold text-lg text-text-main">Actualizar Estado del Pedido</h3>
+                                <Button variant="ghost" size="icon" onClick={() => setIsStatusModalOpen(false)}>
+                                    <X size={20} />
+                                </Button>
+                            </div>
+                            <div className="p-6">
+                                <div className="flex flex-col items-center text-center mb-6">
+                                    <AlertCircle size={48} className="text-primary mb-4 opacity-80" />
+                                    <p className="text-text-secondary">
+                                        ¿Qué acción deseas realizar con este pedido?
+                                        <br />
+                                        Esta acción actualizará el estado inmediatamente.
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-1 gap-3">
+                                    <Button
+                                        className="bg-green-600 hover:bg-green-700 text-white w-full py-6 text-lg"
+                                        onClick={() => handleUpdateStatus('completado')}
+                                        disabled={isUpdatingStatus}
+                                    >
+                                        {isUpdatingStatus ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2" />}
+                                        Marcar como Completado
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        className="w-full py-6 text-lg"
+                                        onClick={() => handleUpdateStatus('cancelado')}
+                                        disabled={isUpdatingStatus}
+                                    >
+                                        {isUpdatingStatus ? <Loader2 className="animate-spin mr-2" /> : <X className="mr-2" />}
+                                        Cancelar Pedido
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }

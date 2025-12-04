@@ -13,7 +13,8 @@ import {
     MousePointerClick,
     Receipt,
     UserPlus,
-    Megaphone
+    Megaphone,
+    Archive
 } from 'lucide-react';
 
 import KPICard from '@/components/console/dashboard/KPICard';
@@ -142,27 +143,45 @@ export default function DashboardPage() {
     return (
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            <div className="mb-8">
+                <h1 className="text-4xl font-extrabold  mb-2 tracking-tight">
                     Tablero de Control
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                    Métricas en tiempo real del sistema
+                <p className="text-lg text-gray-600 ">
+                    Métricas en tiempo real y análisis del sistema
                 </p>
             </div>
 
             {/* Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6 dark:border dark:border-gray-700">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-surface rounded-2xl  p-6 mb-8 shadow-sm border border-gray-900/20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Residential Filter */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            Residencial
+                        </label>
+                        <select
+                            value={residentialId || "all"}
+                            onChange={(e) => handleResidentialChange(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none"
+                        >
+                            <option value="all">Todos los residenciales</option>
+                            {residentials.map((res) => (
+                                <option key={res.$id} value={res.$id}>
+                                    {res.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     {/* Date Range Filter */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                             Período de Tiempo
                         </label>
                         <select
                             value={dateFilter}
                             onChange={(e) => handleDateFilterChange(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none"
                         >
                             <option value="today">Hoy</option>
                             <option value="7days">Últimos 7 días</option>
@@ -173,24 +192,7 @@ export default function DashboardPage() {
                         </select>
                     </div>
 
-                    {/* Residential Filter */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Residencial
-                        </label>
-                        <select
-                            value={residentialId || "all"}
-                            onChange={(e) => handleResidentialChange(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        >
-                            <option value="all">Todos los residenciales</option>
-                            {residentials.map((res) => (
-                                <option key={res.$id} value={res.$id}>
-                                    {res.nombre}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+
                 </div>
             </div>
 
@@ -212,6 +214,13 @@ export default function DashboardPage() {
                             previousValue={kpis.ads.totalActivePrevious}
                             change={kpis.ads.totalActiveChange}
                             icon={Package}
+                        />
+                        <KPICard
+                            title="Anuncios Inactivos"
+                            value={kpis.ads.totalInactive}
+                            previousValue={kpis.ads.totalInactivePrevious}
+                            change={kpis.ads.totalInactiveChange}
+                            icon={Archive}
                         />
                         <KPICard
                             title="Tasa de Crecimiento"

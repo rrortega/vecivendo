@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,6 +6,7 @@ import { Query } from "appwrite";
 import { useToast } from "@/context/ToastContext";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import ImageUpload from '@/components/console/ImageUpload';
 import { Plus, Save, Trash2, Edit2, X, MapPin, Phone, Mail, Globe, Calendar, ArrowLeft, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -44,6 +44,7 @@ export default function ResidentialDetailPage({ params }) {
     const [formData, setFormData] = useState({
         nombre: "",
         slug: "",
+        portada: "",
         direccion: "",
         ciudad: "",
         provincia_estado: "",
@@ -67,6 +68,7 @@ export default function ResidentialDetailPage({ params }) {
             const data = {
                 nombre: doc.nombre || "",
                 slug: doc.slug || "",
+                portada: doc.portada || "",
                 direccion: doc.direccion || "",
                 ciudad: doc.ciudad || "",
                 provincia_estado: doc.provincia_estado || "",
@@ -451,6 +453,14 @@ export default function ResidentialDetailPage({ params }) {
                                             onChange={handleChange}
                                             required
                                             className="w-full px-4 py-2 rounded-lg border admin-border bg-white dark:bg-gray-700 admin-text focus:ring-2 focus:ring-primary-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="col-span-1 md:col-span-2">
+                                        <ImageUpload
+                                            label="Imagen de Portada"
+                                            value={formData.portada}
+                                            onChange={(url) => setFormData(prev => ({ ...prev, portada: url }))}
+                                            bucketId="images"
                                         />
                                     </div>
                                 </div>
