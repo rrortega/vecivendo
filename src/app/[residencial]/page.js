@@ -36,6 +36,15 @@ export default function ResidentialHome({ params }) {
 
     const { residential: residentialData } = useResidential(residencial);
     const [sortOption, setSortOption] = React.useState("recent");
+    const [isScrolled, setIsScrolled] = React.useState(false);
+
+    React.useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 50);
+        };
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
     const residentialName = residentialData?.nombre || residencial;
     const currency = residentialData?.moneda || "MXN";
@@ -43,12 +52,16 @@ export default function ResidentialHome({ params }) {
     return (
         <div className="min-h-screen bg-background pb-20 md:pb-0 transition-all duration-300" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
             <CommunityAlertBar residentialSlug={residencial} />
-            <HomeHeader
-                residencialName={residentialName}
-                residentialSlug={residencial}
-                sortOption={sortOption}
-                onSortChange={setSortOption}
-            />
+
+            {/* Header - Hidden on mobile when scrolled */}
+            <div className={`transition-transform duration-300 ${isScrolled ? '-translate-y-full md:translate-y-0' : 'translate-y-0'}`}>
+                <HomeHeader
+                    residencialName={residentialName}
+                    residentialSlug={residencial}
+                    sortOption={sortOption}
+                    onSortChange={setSortOption}
+                />
+            </div>
 
             <div className="max-w-7xl mx-auto pt-20 md:pt-20 md:flex md:px-4 md:gap-6">
                 {/* Sidebar for Desktop */}
@@ -57,9 +70,13 @@ export default function ResidentialHome({ params }) {
                 <main className="flex-1 min-w-0">
                     <PromoBanner residentialSlug={residencial} />
 
-                    {/* Mobile Category Chips */}
+                    {/* Mobile Category Chips - Sticky on scroll */}
                     <div className="md:hidden">
-                        <CategoryChips residentialId={residentialData?.$id} />
+                        <div className={`${isScrolled ? 'fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm pt-4 shadow-md animate-in slide-in-from-top duration-300' : ''}`}>
+                            <CategoryChips residentialId={residentialData?.$id} />
+                        </div>
+                        {/* Placeholder to prevent layout jump when fixed */}
+                        {isScrolled && <div className="h-[52px]" />}
                     </div>
 
                     <ProductGrid
@@ -71,7 +88,10 @@ export default function ResidentialHome({ params }) {
                 </main>
             </div>
 
-            <BottomNav />
+            {/* Bottom Nav - Always visible on mobile */}
+            <div className="md:hidden">
+                <BottomNav />
+            </div>
         </div>
     );
 }

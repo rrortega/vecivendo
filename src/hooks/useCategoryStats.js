@@ -60,7 +60,7 @@ export const useCategoryStats = (residentialId) => {
                     const expirationDate = new Date(updatedAt.getTime() + daysValid * 24 * 60 * 60 * 1000);
 
                     if (expirationDate > now) {
-                        const catSlug = ad.categoria_slug || ad.categoria; // Handle both if needed, usually slug
+                        const catSlug = ad.categoria_slug || (ad.categoria ? ad.categoria.toLowerCase() : null);
                         if (catSlug) {
                             categoryCounts[catSlug] = (categoryCounts[catSlug] || 0) + 1;
                         }

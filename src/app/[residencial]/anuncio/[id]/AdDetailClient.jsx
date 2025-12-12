@@ -18,6 +18,7 @@ import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useResidential } from "@/hooks/useResidential";
 import { Clock } from "lucide-react";
+import { AdDetailSkeleton } from "@/components/skeletons/AdDetailSkeleton";
 
 export default function AdDetailPage({ params }) {
     const { residencial: residencialSlug, id: adId, variant_slug } = params;
@@ -31,6 +32,7 @@ export default function AdDetailPage({ params }) {
     const [selectedImage, setSelectedImage] = useState(0);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
+    const [advertiserInfo, setAdvertiserInfo] = useState(null);
 
     // Variant state
     const [variants, setVariants] = useState([]);
@@ -45,6 +47,16 @@ export default function AdDetailPage({ params }) {
         .replace(/\-\-+/g, '-')
         .replace(/^-+/, '')
         .replace(/-+$/, '');
+
+    // Helper for safe UTF-8 decoding
+    const safeAtob = (str) => {
+        try {
+            return decodeURIComponent(escape(atob(str)));
+        } catch (e) {
+            console.warn("UTF-8 decode failed, falling back to atob", e);
+            return atob(str);
+        }
+    };
 
     // Calculate expiration
     const updatedAt = ad ? new Date(ad.$updatedAt) : null;
@@ -69,16 +81,12 @@ export default function AdDetailPage({ params }) {
                 const adData = await databases.getDocument(dbId, "anuncios", adId);
                 setAd(adData);
 
-                // Parse Variants
+                // Initialize variants immediately
                 if (adData.variants && adData.variants.length > 0) {
+                    // ... (Variant parsing logic, same as before)
                     try {
                         const parsedVariants = adData.variants.map(v => {
-                            const parsed = JSON.parse(atob(v));
-                            // Map fields to consistent structure
-                            // Support both schemas: 
-                            // New: type, price, minQuantity, offer
-                            // Old/Existing: name, total_price (or price_raw), units, offer (object or string)
-
+                            const parsed = JSON.parse(safeAtob(v));
                             const type = parsed.type || parsed.name;
                             const minQuantity = parsed.minQuantity || parsed.units || 1;
                             let price = parsed.price || parsed.unit_price;
@@ -88,10 +96,8 @@ export default function AdDetailPage({ params }) {
                             } else if (!price && typeof parsed.price_raw === 'number') {
                                 price = parsed.price_raw;
                             }
-
                             price = price || 0;
 
-                            // Handle offer: could be string or object
                             let offerText = null;
                             if (parsed.offer) {
                                 if (typeof parsed.offer === 'string') {
@@ -112,70 +118,71 @@ export default function AdDetailPage({ params }) {
                         });
                         setVariants(parsedVariants);
 
-                        // Select variant based on slug or default to null (main ad)
                         if (variant_slug) {
                             const match = parsedVariants.find(v => v.slug === variant_slug);
                             if (match) {
                                 setSelectedVariant(match);
                                 setQuantity(parseInt(match.minQuantity) || 1);
                             }
-                        } else {
-                            setSelectedVariant(null);
+                        } else if (parsedVariants.length > 0) {
+                            const firstVariant = parsedVariants[0];
+                            router.replace(`/${residencialSlug}/anuncio/${adId}/${firstVariant.slug}`);
+                            // We can continue rendering, the redirect will happen
                         }
                     } catch (e) {
                         console.error("Error parsing variants:", e);
                     }
                 }
 
+                // UNBLOCK RENDER HERE
+                setLoading(false);
+
+                // ASYNC: Fetch Advertiser Info
+                if (adData.celular_anunciante) {
+                    fetch(`/api/users/lookup?phone=${encodeURIComponent(adData.celular_anunciante)}`)
+                        .then(res => res.ok ? res.json() : null)
+                        .then(userData => {
+                            if (userData) setAdvertiserInfo(userData);
+                        })
+                        .catch(err => console.error("Error looking up advertiser:", err));
+                }
+
+                // ASYNC: Fetch Related Ads
+                (async () => {
+                    let queryField = null;
+                    let queryValue = null;
+
+                    if (adData.celular) { queryField = 'celular'; queryValue = adData.celular; }
+                    else if (adData.userId) { queryField = 'userId'; queryValue = adData.userId; }
+                    else if (adData.user_id) { queryField = 'user_id'; queryValue = adData.user_id; }
+                    else if (adData.anuncianteId) { queryField = 'anuncianteId'; queryValue = adData.anuncianteId; }
+                    else if (adData.celular_anunciante) { queryField = 'celular_anunciante'; queryValue = adData.celular_anunciante; }
+
+                    if (queryField && queryValue) {
+                        try {
+                            const relatedList = await databases.listDocuments(
+                                dbId, "anuncios",
+                                [
+                                    Query.equal(queryField, queryValue),
+                                    Query.equal("activo", true),
+                                    Query.notEqual("$id", adId),
+                                    Query.limit(4)
+                                ]
+                            );
+                            setRelatedAds(relatedList.documents);
+                        } catch (e) { console.error("Error fetching related:", e); }
+                    }
+                })();
+
+
                 // Log View
                 import("@/lib/analytics").then(({ logAdView }) => {
-                    // Log view with variant info if selected
-                    // We might need to wait for state update or just pass it directly
-                    // For now, logging the main ad view. 
-                    // Ideally, we should log the specific variant view if applicable.
                     logAdView(adData.$id, false, null, "view");
                 });
-
-                // Fetch Related Ads from same seller (anunciante)
-                // Priority: celular > userId > user_id > anuncianteId
-                let queryField = null;
-                let queryValue = null;
-
-                if (adData.celular) {
-                    queryField = 'celular';
-                    queryValue = adData.celular;
-                } else if (adData.userId) {
-                    queryField = 'userId';
-                    queryValue = adData.userId;
-                } else if (adData.user_id) {
-                    queryField = 'user_id';
-                    queryValue = adData.user_id;
-                } else if (adData.anuncianteId) {
-                    queryField = 'anuncianteId';
-                    queryValue = adData.anuncianteId;
-                }
-
-                if (queryField && queryValue) {
-                    const relatedList = await databases.listDocuments(
-                        dbId,
-                        "anuncios",
-                        [
-                            Query.equal(queryField, queryValue),
-                            Query.equal("active", true), // Ensure we use 'active' or 'activo' consistently. Schema says 'active' in some places.
-                            Query.notEqual("$id", adId),
-                            Query.limit(4)
-                        ]
-                    );
-                    setRelatedAds(relatedList.documents);
-                } else {
-                    console.log("No advertiser identifier found in ad data:", adData);
-                    setRelatedAds([]);
-                }
 
             } catch (err) {
                 console.error("Error fetching ad data:", err);
                 setError("No pudimos cargar la información del anuncio.");
-            } finally {
                 setLoading(false);
             }
         }
@@ -194,14 +201,20 @@ export default function AdDetailPage({ params }) {
     const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
 
     const handleAddToCart = () => {
+        // Enforce variant selection if variants exist
+        if (variants.length > 0 && !selectedVariant) {
+            showToast("Por favor selecciona una opción", "error");
+            // Scroll to variants?
+            return;
+        }
+
         let productToAdd = { ...ad };
 
         if (selectedVariant) {
-            // Create a composite ID for the cart item to distinguish variants
             productToAdd = {
                 ...productToAdd,
                 $id: `${ad.$id}-${selectedVariant.slug}`,
-                adId: ad.$id, // Keep reference to original ad ID
+                adId: ad.$id,
                 price: selectedVariant.price,
                 variant: selectedVariant.type,
                 variantSlug: selectedVariant.slug,
@@ -214,7 +227,6 @@ export default function AdDetailPage({ params }) {
 
         if (result.success) {
             showToast(`${quantity} artículo(s) agregado(s) al carrito`, "success");
-            // Log add to cart interaction
             import("@/lib/analytics").then(({ logAdView }) => {
                 logAdView(ad.$id, false, null, "click");
             });
@@ -227,7 +239,25 @@ export default function AdDetailPage({ params }) {
 
     const handleConfirmCartOverwrite = () => {
         clearCart();
-        addToCart(ad, quantity);
+        // Recalculate productToAdd because handleAddToCart scope is gone
+        // Actually simple call handleAddToCart again?
+        // No, need to clear first.
+
+        let productToAdd = { ...ad };
+        if (selectedVariant) {
+            productToAdd = {
+                ...productToAdd,
+                $id: `${ad.$id}-${selectedVariant.slug}`,
+                adId: ad.$id,
+                price: selectedVariant.price,
+                variant: selectedVariant.type,
+                variantSlug: selectedVariant.slug,
+                offer: selectedVariant.offer,
+                minQuantity: parseInt(selectedVariant.minQuantity)
+            };
+        }
+
+        addToCart(productToAdd, quantity);
         showToast("Carrito actualizado con el nuevo producto", "success");
         setIsConflictModalOpen(false);
     };
@@ -258,11 +288,7 @@ export default function AdDetailPage({ params }) {
     };
 
     if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
-                <Loader2 className="animate-spin text-primary" size={48} />
-            </div>
-        );
+        return <AdDetailSkeleton />;
     }
 
     if (error || !ad) {
@@ -286,6 +312,25 @@ export default function AdDetailPage({ params }) {
     const images = ad.imagenes || [];
     const currentImage = images[selectedImage];
 
+    // Dynamic Title
+    let displayTitle = ad.titulo;
+    if (selectedVariant) {
+        const variantName = selectedVariant.type || "";
+        const adTitle = ad.titulo || "";
+        // If variant name is not contained in ad title (case insensitive), prepend it
+        if (!adTitle.toLowerCase().includes(variantName.toLowerCase())) {
+            displayTitle = `${variantName} - ${adTitle}`;
+        }
+    }
+    // Price to show
+    const displayPrice = selectedVariant ? selectedVariant.price : (variants.length > 0 ? variants[0].price : ad.precio);
+    // If variants exist but none selected, maybe show "Desde" or range?
+    // Request says: "Cuando un anuncio tiene varaintes no poner el precio Standard sino solo las varaintes".
+    // I will show the lowest price if none selected?
+    const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => v.price)) : ad.precio;
+    const finalDisplayPrice = selectedVariant ? selectedVariant.price : (variants.length > 0 ? lowestPrice : ad.precio);
+
+
     return (
         <div className="min-h-screen bg-background pb-24" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
             <CommunityAlertBar residentialSlug={residencialSlug} />
@@ -303,10 +348,13 @@ export default function AdDetailPage({ params }) {
                     <div className="space-y-4">
                         <div className="aspect-square bg-surface rounded-2xl overflow-hidden border border-border relative group">
                             {currentImage ? (
-                                <img
+                                <Image
                                     src={currentImage}
                                     alt={ad.titulo}
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    className="object-cover"
+                                    priority
+                                    sizes="(max-width: 768px) 100vw, 50vw"
                                 />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-text-secondary">
@@ -360,11 +408,11 @@ export default function AdDetailPage({ params }) {
                         {/* Title & Price */}
                         <div>
                             <h1 className="text-3xl md:text-4xl font-bold text-text-main mb-4 leading-tight">
-                                {ad.titulo}
+                                {displayTitle}
                             </h1>
                             <div className="flex items-baseline gap-2">
                                 <span className="text-4xl md:text-5xl font-bold text-primary">
-                                    {formatPrice(selectedVariant ? selectedVariant.price : ad.precio)}
+                                    {formatPrice(finalDisplayPrice)}
                                 </span>
                                 <span className="text-text-secondary text-lg">{ad.moneda || 'MXN'}</span>
                             </div>
@@ -373,27 +421,22 @@ export default function AdDetailPage({ params }) {
                                     Precio por {selectedVariant.type} (Mínimo {selectedVariant.minQuantity} unidades)
                                 </p>
                             )}
+                            {!selectedVariant && variants.length > 0 && (
+                                <p className="text-sm text-text-secondary mt-1">
+                                    Desde {formatPrice(lowestPrice)}
+                                </p>
+                            )}
                         </div>
 
                         {/* Variants Selector */}
                         {variants.length > 0 && (
                             <div className="space-y-3">
                                 <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
-                                    Variantes disponibles
+                                    Selecciona una opción
                                 </h3>
                                 <div className="flex flex-wrap gap-2">
-                                    <button
-                                        onClick={() => router.push(`/${residencialSlug}/anuncio/${adId}`)}
-                                        className={`px-4 py-2 rounded-lg border transition-all text-left relative ${!selectedVariant
-                                            ? 'bg-primary text-white border-primary'
-                                            : 'bg-surface text-text-main border-border hover:border-primary'
-                                            }`}
-                                    >
-                                        <div className="font-medium">Estándar</div>
-                                        <div className={`text-xs ${!selectedVariant ? 'text-white/80' : 'text-text-secondary'}`}>
-                                            {formatPrice(ad.precio)}
-                                        </div>
-                                    </button>
+                                    {/* Standard Option: Hidden if variants exist per request */}
+                                    {/* variants.map... */}
                                     {variants.map((variant, idx) => (
                                         <button
                                             key={idx}
@@ -451,7 +494,7 @@ export default function AdDetailPage({ params }) {
                             <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
                                 Descripción
                             </h3>
-                            <p className="text-text-main leading-relaxed">
+                            <p className="text-text-main leading-relaxed whitespace-pre-line">
                                 {ad.descripcion || "Sin descripción disponible."}
                             </p>
                         </div>
@@ -469,11 +512,21 @@ export default function AdDetailPage({ params }) {
                                     <UserIcon className="text-primary" size={28} />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="font-semibold text-text-main text-lg">Vecino de {residentialName}</p>
+                                    <p
+                                        key={advertiserInfo ? 'real-name' : 'placeholder-name'}
+                                        className="font-semibold text-text-main text-lg animate-in fade-in duration-300"
+                                    >
+                                        {advertiserInfo ? advertiserInfo.name : (ad.celular_anunciante ? `Vecino (${ad.celular_anunciante.slice(-4)})` : "Vecino de la comunidad")}
+                                    </p>
                                     <div className="flex items-center gap-1 text-sm text-text-secondary">
-                                        <Star size={14} className="fill-yellow-400 text-yellow-400" />
-                                        <span className="font-medium text-text-main">4.9</span>
-                                        <span>(24 reseñas)</span>
+                                        {/* Fake ratings removed */}
+                                        {/* Only show if we had real ratings, e.g. advertiserInfo.rating */}
+                                        {advertiserInfo && advertiserInfo.createdAt && (
+                                            <span>Miembro desde {new Date(advertiserInfo.registrationDate).getFullYear()}</span>
+                                        )}
+                                        {!advertiserInfo && (
+                                            <span>Vecino verificado</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -484,7 +537,7 @@ export default function AdDetailPage({ params }) {
                 {/* Related Products */}
                 {
                     relatedAds.length > 0 && (
-                        <div className="mb-12">
+                        <div className="mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-forwards">
                             <h2 className="text-2xl font-bold text-text-main mb-6">Más anuncios de este anunciante</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {relatedAds.map(related => {
@@ -568,7 +621,10 @@ export default function AdDetailPage({ params }) {
                                     {isActive ? (
                                         <>
                                             <span className="hidden md:inline">Agregar al carrito • </span>
-                                            <span>{formatPrice((selectedVariant ? selectedVariant.price : ad.precio) * quantity)}</span>
+                                            {/* Show price of selected variant, or range if none selected but variants exist? */}
+                                            {/* If no variant selected and variants exist, showing total based on lowest price might be confusing. */}
+                                            {/* Let's show "Desde..." or just price. */}
+                                            <span>{formatPrice(finalDisplayPrice * quantity)}</span>
                                         </>
                                     ) : 'No disponible'}
                                 </Button>

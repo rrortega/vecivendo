@@ -11,13 +11,14 @@ import { useSearchParams } from "next/navigation";
 
 import { useFavorites } from "@/hooks/useFavorites";
 
-export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: propResidentialId, sortOption = "recent" }) => {
+export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: propResidentialId, sortOption = "recent", showFixedPagination = false }) => {
+    // ... (existing state) ...
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isFetching, setIsFetching] = useState(false);
     const [residentialId, setResidentialId] = useState(propResidentialId);
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [itemsPerPage, setItemsPerPage] = useState(24);
     const [totalItems, setTotalItems] = useState(0);
 
     const searchParams = useSearchParams();
@@ -27,6 +28,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
 
     const { isFavorite, toggleFavorite } = useFavorites();
 
+    // ... (existing effects) ...
     useEffect(() => {
         if (propResidentialId) {
             setResidentialId(propResidentialId);
@@ -34,10 +36,12 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         }
 
         const fetchResidentialId = async () => {
+            // ...
             if (!residentialSlug) return;
             try {
                 const databases = new Databases(client);
                 const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+                // ...
                 const response = await databases.listDocuments(
                     dbId,
                     "residenciales",
@@ -53,12 +57,11 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         fetchResidentialId();
     }, [residentialSlug, propResidentialId]);
 
-    // Reset page when filters change
+    // ... (rest of effects) ...
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery, categoryFilter, sortOption, itemsPerPage]);
 
-    // Then fetch products filtered by residential
     useEffect(() => {
         if (!residentialId) return;
 
@@ -88,13 +91,10 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 ];
 
                 if (categoryFilter) {
-                    queries.push(Query.equal("categoria", categoryFilter));
+                    queries.push(Query.equal("categoria_slug", categoryFilter.toLowerCase()));
                 }
 
                 if (searchQuery) {
-                    // Attempt to use server-side search. 
-                    // Requires a Fulltext index on 'titulo' (and 'descripcion' if desired).
-                    // If index is missing, this might fail, so we catch errors.
                     queries.push(Query.search("titulo", searchQuery));
                 }
 
@@ -114,17 +114,16 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         };
 
         fetchProducts();
-    }, [residentialId, sortOption, currentPage, itemsPerPage, categoryFilter, searchQuery]); // Added searchQuery
+    }, [residentialId, sortOption, currentPage, itemsPerPage, categoryFilter, searchQuery]);
 
-    // Optimistic filtering: Filter and sort the CURRENTLY loaded products immediately.
-    // This gives instant feedback while the server query runs in the background.
+    // ... (filtering and sorting logic) ...
     const filteredProducts = products
         .filter(product => {
             const matchesSearch = !searchQuery ||
                 product.titulo?.toLowerCase().includes(searchQuery) ||
                 product.descripcion?.toLowerCase().includes(searchQuery);
 
-            const matchesCategory = !categoryFilter || product.categoria === categoryFilter;
+            const matchesCategory = !categoryFilter || product.categoria_slug === categoryFilter.toLowerCase();
 
             return matchesSearch && matchesCategory;
         })
@@ -134,7 +133,6 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
             } else if (sortOption === "price_desc") {
                 return b.precio - a.precio;
             } else {
-                // Default: recent (updatedAt desc)
                 return new Date(b.$updatedAt) - new Date(a.$updatedAt);
             }
         });
@@ -153,7 +151,6 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
     const handlePageChange = (newPage) => {
         if (newPage >= 1 && newPage <= totalPages) {
             setCurrentPage(newPage);
-            // Scroll to top of grid
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
@@ -195,76 +192,97 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-4"
                 : "flex flex-col gap-4 px-4 w-full"
             }>
-                {filteredProducts.map((product) => (
-                    <Link
-                        href={`/${residentialSlug}/anuncio/${product.$id}`}
-                        key={product.$id}
-                        className={`group bg-surface rounded-xl overflow-hidden border border-gray-200 dark:border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${viewMode === "list" ? "flex flex-row h-40 md:h-48" : ""
-                            }`}
-                    >
-                        {/* Image Container */}
-                        <div className={`${viewMode === "list" ? "w-40 md:w-56 shrink-0" : "aspect-[4/3]"} relative overflow-hidden bg-gray-100 dark:bg-white/5`}>
-                            {(() => {
-                                const images = product.imagenes || [];
-                                const firstImage = Array.isArray(images) ? images[0] : null;
-                                return firstImage ? (
-                                    <img
-                                        src={firstImage}
-                                        alt={product.titulo}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-text-secondary">
-                                        <ImageOff size={24} className="opacity-50" />
-                                    </div>
-                                );
-                            })()}
+                {filteredProducts.map((product) => {
+                    let adLink = `/${residentialSlug}/anuncio/${product.$id}`;
+                    if (product.variants && product.variants.length > 0) {
+                        try {
+                            const safeAtob = (str) => {
+                                try { return decodeURIComponent(escape(atob(str))); }
+                                catch (e) { return atob(str); }
+                            };
+                            const generateSlug = (text) => text.toString().toLowerCase()
+                                .replace(/\s+/g, '-')
+                                .replace(/[^\w\-]+/g, '')
+                                .replace(/\-\-+/g, '-')
+                                .replace(/^-+/, '')
+                                .replace(/-+$/, '');
 
-                            {/* Favorite Button */}
-                            <button
-                                onClick={(e) => toggleFavorite(e, product.$id)}
-                                className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-sm transition-all shadow-sm duration-200 ${isFavorite(product.$id)
-                                    ? "bg-white text-red-500 opacity-100 scale-110"
-                                    : "bg-white/80 text-gray-600 hover:text-red-500 border border-transparent hover:border-red-500 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
-                                    }`}
-                            >
-                                <Heart size={18} fill={isFavorite(product.$id) ? "currentColor" : "none"} />
-                            </button>
-                        </div>
+                            const firstVariantStr = product.variants[0];
+                            const parsed = JSON.parse(safeAtob(firstVariantStr));
+                            const type = parsed.type || parsed.name;
+                            if (type) {
+                                const slug = generateSlug(type);
+                                adLink = `/${residentialSlug}/anuncio/${product.$id}/${slug}`;
+                            }
+                        } catch (e) {
+                            console.error("Error parsing variant for link:", e);
+                        }
+                    }
 
-                        {/* Content */}
-                        <div className={`p-3 ${viewMode === "list" ? "flex flex-col flex-1 justify-between p-4" : ""}`}>
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                                <h3 className={`font-medium text-text-main leading-tight group-hover:text-primary transition-colors ${viewMode === "list" ? "text-lg line-clamp-2" : "text-sm line-clamp-2"}`}>
-                                    {product.titulo}
-                                </h3>
+                    return (
+                        <Link
+                            href={adLink}
+                            key={product.$id}
+                            className={`group bg-surface rounded-xl overflow-hidden border border-gray-200 dark:border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${viewMode === "list" ? "flex flex-row h-40 md:h-48" : ""
+                                }`}
+                        >
+                            <div className={`${viewMode === "list" ? "w-40 md:w-56 shrink-0" : "aspect-[4/3]"} relative overflow-hidden bg-gray-100 dark:bg-white/5`}>
+                                {(() => {
+                                    const images = product.imagenes || [];
+                                    const firstImage = Array.isArray(images) ? images[0] : null;
+                                    return firstImage ? (
+                                        <img
+                                            src={firstImage}
+                                            alt={product.titulo}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-text-secondary">
+                                            <ImageOff size={24} className="opacity-50" />
+                                        </div>
+                                    );
+                                })()}
+                                <button
+                                    onClick={(e) => toggleFavorite(e, product.$id)}
+                                    className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-sm transition-all shadow-sm duration-200 ${isFavorite(product.$id)
+                                        ? "bg-white text-red-500 opacity-100 scale-110"
+                                        : "bg-white/80 text-gray-600 hover:text-red-500 border border-transparent hover:border-red-500 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+                                        }`}
+                                >
+                                    <Heart size={18} fill={isFavorite(product.$id) ? "currentColor" : "none"} />
+                                </button>
                             </div>
-
-                            {viewMode === "list" && (
-                                <p className="text-sm text-text-secondary line-clamp-2 mb-2 hidden md:block">
-                                    {product.descripcion}
-                                </p>
-                            )}
-
-                            <div className="flex items-end justify-between mt-2">
-                                <div className="flex flex-col">
-                                    <span className="text-xs text-text-secondary mb-0.5">Precio</span>
-                                    <span className="text-lg font-bold text-primary">
-                                        {formatPrice(product.precio)}
-                                    </span>
+                            <div className={`p-3 ${viewMode === "list" ? "flex flex-col flex-1 justify-between p-4" : ""}`}>
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                    <h3 className={`font-medium text-text-main leading-tight group-hover:text-primary transition-colors ${viewMode === "list" ? "text-lg line-clamp-2" : "text-sm line-clamp-2"}`}>
+                                        {product.titulo}
+                                    </h3>
                                 </div>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-primary hover:text-primary -mr-2">
-                                    <ShoppingCart size={18} />
-                                </Button>
+                                {viewMode === "list" && (
+                                    <p className="text-sm text-text-secondary line-clamp-2 mb-2 hidden md:block">
+                                        {product.descripcion}
+                                    </p>
+                                )}
+                                <div className="flex items-end justify-between mt-2">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs text-text-secondary mb-0.5">Precio</span>
+                                        <span className="text-lg font-bold text-primary">
+                                            {formatPrice(product.precio)}
+                                        </span>
+                                    </div>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-primary hover:text-primary -mr-2">
+                                        <ShoppingCart size={18} />
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
-                    </Link>
-                ))}
+                        </Link>
+                    )
+                })}
             </div>
 
             {/* Pagination Controls */}
             {totalItems > 0 && totalPages > 1 && (
-                <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-border p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                <div className={`${showFixedPagination ? 'fixed flex' : 'hidden md:flex'} bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-border p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-transform duration-300`}>
                     <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-2 text-sm text-text-secondary">
                             <span>Mostrar:</span>
@@ -273,14 +291,12 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
                                 className="bg-surface border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                             >
-                                <option value={10}>10</option>
-                                <option value={20}>20</option>
-                                <option value={50}>50</option>
-                                <option value={100}>100</option>
+                                <option value={12}>12 por página</option>
+                                <option value={24}>24 por página</option>
+                                <option value={48}>48 por página</option>
+                                <option value={96}>96 por página</option>
                             </select>
-                            <span>por página</span>
                         </div>
-
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"

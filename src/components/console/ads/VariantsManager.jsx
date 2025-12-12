@@ -6,7 +6,25 @@ import { Plus, Trash2, Package, Tag, DollarSign, Percent } from "lucide-react";
 export default function VariantsManager({ variants = [], onChange }) {
     const [activeVariant, setActiveVariant] = useState(0);
 
-    // Decodificar variantes desde base64
+    // Helper for safe Base64 encoding/decoding with UTF-8 support
+    const safeAtob = (str) => {
+        try {
+            return decodeURIComponent(escape(atob(str)));
+        } catch (e) {
+            console.warn("UTF-8 decode failed, falling back to atob", e);
+            return atob(str);
+        }
+    };
+
+    const safeBtoa = (str) => {
+        try {
+            return btoa(unescape(encodeURIComponent(str)));
+        } catch (e) {
+            console.error("UTF-8 encode failed", e);
+            return btoa(str);
+        }
+    };
+
     // Decodificar variantes desde base64
     const decodedVariants = variants.map((variant, index) => {
         try {
@@ -14,7 +32,7 @@ export default function VariantsManager({ variants = [], onChange }) {
             if (typeof variant === 'object' && variant !== null) return variant;
 
             // Intentar decodificar base64
-            const decoded = atob(variant);
+            const decoded = safeAtob(variant);
             return JSON.parse(decoded);
         } catch (error) {
             console.error(`Error decoding variant at index ${index}:`, error, variant);
@@ -43,7 +61,7 @@ export default function VariantsManager({ variants = [], onChange }) {
             offer: null
         };
 
-        const encoded = btoa(JSON.stringify(newVariant));
+        const encoded = safeBtoa(JSON.stringify(newVariant));
         onChange([...variants, encoded]);
         setActiveVariant(decodedVariants.length);
     };
@@ -59,7 +77,7 @@ export default function VariantsManager({ variants = [], onChange }) {
     const handleVariantChange = (index, field, value) => {
         const variant = decodedVariants[index];
         const updated = { ...variant, [field]: value };
-        const encoded = btoa(JSON.stringify(updated));
+        const encoded = safeBtoa(JSON.stringify(updated));
         const newVariants = [...variants];
         newVariants[index] = encoded;
         onChange(newVariants);
@@ -80,7 +98,7 @@ export default function VariantsManager({ variants = [], onChange }) {
             offer: { ...offer, [field]: value }
         };
 
-        const encoded = btoa(JSON.stringify(updated));
+        const encoded = safeBtoa(JSON.stringify(updated));
         const newVariants = [...variants];
         newVariants[index] = encoded;
         onChange(newVariants);

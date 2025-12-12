@@ -466,8 +466,8 @@ export default function ProfilePage({ params }) {
                     {/* Phone Input */}
                     <div>
                         <label className="block text-sm font-medium text-text-secondary mb-1">Celular</label>
-                        <div className="flex gap-2">
-                            <div className="flex items-center gap-2 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-secondary select-none h-11">
+                        <div className="flex gap-2 items-start">
+                            <div className="flex items-center gap-2 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-secondary select-none shrink-0">
                                 {residentialData?.country ? (
                                     <img
                                         src={`https://flagcdn.com/${residentialData.country.toLowerCase()}.svg`}
@@ -480,12 +480,12 @@ export default function ProfilePage({ params }) {
                                 <span>+{residentialData?.phone_prefix || '52'}</span>
                             </div>
                             {userProfile.telefono_verificado ? (
-                                <div className="relative flex-1">
+                                <div className="relative flex-1 min-w-0">
                                     <input
                                         type="tel"
                                         value={userProfile.telefono}
                                         readOnly
-                                        className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main outline-none pr-10 opacity-70 cursor-not-allowed h-11 mb-2"
+                                        className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main outline-none pr-10 opacity-70 cursor-not-allowed h-11"
                                         disabled
                                     />
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 pointer-events-none">
@@ -493,7 +493,7 @@ export default function ProfilePage({ params }) {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex flex-1">
+                                <div className="flex flex-col md:flex-row flex-1 min-w-0 gap-2 md:gap-0">
                                     <input
                                         type="tel"
                                         value={userProfile.telefono}
@@ -501,7 +501,7 @@ export default function ProfilePage({ params }) {
                                             const val = e.target.value.replace(/\D/g, '');
                                             updateUserProfile({ telefono: val, telefono_verificado: false });
                                         }}
-                                        className={`flex-1 bg-surface border border-gray-300 border-r-0 rounded-l-lg ${userProfile.telefono?.length >= 9 ? 'rounded-r-none' : 'rounded-r-lg border-r'} px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-11 mb-2`}
+                                        className={`flex-1 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none ${userProfile.telefono?.length >= 9 ? 'rounded-r-lg md:rounded-r-none md:border-r-0' : ''} min-w-0`}
                                         placeholder="Número celular"
                                     />
                                     {userProfile.telefono?.length >= 9 && (
@@ -509,13 +509,16 @@ export default function ProfilePage({ params }) {
                                             variant="ghost"
                                             onClick={handleSendCode}
                                             disabled={!userProfile.telefono || isVerifying}
-                                            className="w-12 !h-11 !p-0 flex items-center justify-center transition-colors border border-gray-300 rounded-r-lg rounded-l-none bg-surface border-l-transparent hover:border-primary"
+                                            className="w-full md:w-12 flex items-center justify-center py-2 transition-colors border border-gray-300 rounded-lg md:rounded-r-lg md:rounded-l-none bg-surface md:border-l-transparent hover:border-primary"
                                             title="Verificar número"
                                         >
                                             {isVerifying ? (
                                                 <Loader2 className="animate-spin text-primary" size={20} />
                                             ) : (
-                                                <Check className="text-primary" size={20} />
+                                                <>
+                                                    <Check className="text-primary" size={20} />
+                                                    <span className="md:hidden ml-2 font-medium text-primary">Validar celular</span>
+                                                </>
                                             )}
                                         </Button>
                                     )}

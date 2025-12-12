@@ -52,13 +52,35 @@ export async function GET(request) {
         });
 
         if (match) {
-            console.log(`✅ [API] User found: ${match.$id}`);
+            console.log(`✅ [API] User found: ${match.$id} (exact match)`);
             return NextResponse.json({
                 $id: match.$id,
                 name: match.name,
                 email: match.email,
                 phone: match.phone,
                 registrationDate: match.registration
+            });
+        }
+
+        // Fallback: Check if the phone is part of the email (common for some auth flows here)
+        // e.g. 5215541263382@vecivendo.com
+        const normalizePhone = (p) => p.replace(/\D/g, '');
+        const target = normalizePhone(phone);
+
+        const deepMatch = response.users.find(u => {
+            if (u.email && u.email.startsWith(target)) return true;
+            // Also check name or ID if needed, but email is safer for unique phone-based accounts
+            return false;
+        });
+
+        if (deepMatch) {
+            console.log(`✅ [API] User found via email fallback: ${deepMatch.$id}`);
+            return NextResponse.json({
+                $id: deepMatch.$id,
+                name: deepMatch.name,
+                email: deepMatch.email,
+                phone: deepMatch.phone || target, // Return the target phone if user has no phone set
+                registrationDate: deepMatch.registration
             });
         }
 

@@ -19,7 +19,7 @@ export default function AdsPage() {
     const [loading, setLoading] = useState(true);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(12); // Personalizable
+    const [limit, setLimit] = useState(24); // Personalizable
     const [selectedIds, setSelectedIds] = useState([]);
     const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
     const router = useRouter();

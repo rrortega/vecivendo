@@ -82,7 +82,7 @@ export const ReviewsSection = ({ adId, onModalOpenChange }) => {
     const displayedReviews = reviews.slice(0, 3);
 
     return (
-        <div className="py-6 border-t border-border">
+        <div className="py-6 border-t border-border animate-in fade-in duration-500">
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-text-main">Reseñas del Anuncio</h3>
                 <div className="flex items-center gap-2 bg-yellow-50 px-3 py-1 rounded-full border border-yellow-100">

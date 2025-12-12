@@ -26,12 +26,16 @@ export async function generateMetadata({ params }) {
         return {
             title: "Anuncio no encontrado | Vecivendo",
             description: "El anuncio que buscas no existe o ha sido eliminado.",
+            robots: {
+                index: false,
+                follow: false,
+            }
         };
     }
 
     const title = `${ad.titulo} | Vecivendo`;
     const description = ad.descripcion ? ad.descripcion.substring(0, 160) : "Mira este anuncio en Vecivendo";
-    const imageUrl = ad.imagenes && ad.imagenes.length > 0 ? ad.imagenes[0] : "/og-image-default.jpg"; // Fallback image if needed
+    const imageUrl = ad.imagenes && ad.imagenes.length > 0 ? ad.imagenes[0] : "https://vecivendo.com/og-image-default.jpg";
 
     return {
         title: title,
@@ -39,6 +43,7 @@ export async function generateMetadata({ params }) {
         openGraph: {
             title: title,
             description: description,
+            url: `https://vecivendo.com/${params.residencial}/anuncio/${adId}`,
             images: [
                 {
                     url: imageUrl,
@@ -47,7 +52,8 @@ export async function generateMetadata({ params }) {
                     alt: ad.titulo,
                 },
             ],
-            type: "website",
+            type: "article",
+            siteName: "Vecivendo",
         },
         twitter: {
             card: "summary_large_image",
@@ -55,9 +61,39 @@ export async function generateMetadata({ params }) {
             description: description,
             images: [imageUrl],
         },
+        alternates: {
+            canonical: `https://vecivendo.com/${params.residencial}/anuncio/${adId}`,
+        }
     };
 }
 
-export default function Page({ params }) {
-    return <AdDetailClient params={params} />;
+export default async function Page({ params }) {
+    const { id: adId } = params;
+    const ad = await getAd(adId);
+
+    const jsonLd = ad ? {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": ad.titulo,
+        "description": ad.descripcion,
+        "image": ad.imagenes || [],
+        "offers": {
+            "@type": "Offer",
+            "price": ad.precio,
+            "priceCurrency": "MXN", // Asumiendo MXN, ajustar si es necesario
+            "availability": ad.activo ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        }
+    } : null;
+
+    return (
+        <>
+            {jsonLd && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                />
+            )}
+            <AdDetailClient params={params} />
+        </>
+    );
 }

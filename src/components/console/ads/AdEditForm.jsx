@@ -135,11 +135,13 @@ export default function AdEditForm({ ad }) {
         setLoading(true);
         setErrorMessage("");
         try {
+            const selectedCategory = categories.find(c => c.slug === formData.categoria);
             const data = {
                 titulo: formData.titulo,
                 descripcion: formData.descripcion,
                 precio: parseFloat(formData.precio),
-                categoria: formData.categoria,
+                categoria: selectedCategory ? selectedCategory.nombre : formData.categoria, // Save name in 'categoria' for backward comp
+                categoria_slug: formData.categoria, // formData.categoria holds the slug from the select value
                 residencial: formData.residencial || null,
                 celular_anunciante: formData.celular_anunciante || null,
                 dias_vigencia: parseInt(formData.dias_vigencia),

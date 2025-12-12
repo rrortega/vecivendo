@@ -18,29 +18,37 @@ export async function POST(request) {
         console.log('🗑️ [API] Iniciando eliminación batch de', ids.length, 'anuncios');
         console.log('📋 [API] IDs a eliminar:', ids);
 
-        // Eliminar todos en paralelo con manejo individual de errores
-        const deletePromises = ids.map(id => {
-            console.log(`🔄 [API] Intentando eliminar anuncio: ${id}`);
-            return databases.deleteDocument(dbId, adsCollectionId, id)
-                .then(() => {
-                    console.log(`✅ [API] Anuncio ${id} eliminado exitosamente`);
-                    return { id, success: true };
-                })
-                .catch(error => {
-                    console.error(`❌ [API] Error eliminando anuncio ${id}:`, {
-                        message: error.message,
-                        code: error.code,
-                        type: error.type
-                    });
-                    return {
-                        id,
-                        success: false,
-                        error: error.message
-                    };
-                });
-        });
+        // Función para procesar en chunks
+        const processInChunks = async (items, chunkSize = 5) => {
+            const results = [];
+            for (let i = 0; i < items.length; i += chunkSize) {
+                const chunk = items.slice(i, i + chunkSize);
+                console.log(`🔄 [API] Procesando chunk ${Math.floor(i / chunkSize) + 1} de ${Math.ceil(items.length / chunkSize)}`);
 
-        const results = await Promise.all(deletePromises);
+                const chunkPromises = chunk.map(id => {
+                    console.log(`   🗑️ Intentando eliminar anuncio: ${id}`);
+                    return databases.deleteDocument(dbId, adsCollectionId, id)
+                        .then(() => {
+                            console.log(`   ✅ Anuncio ${id} eliminado exitosamente`);
+                            return { id, success: true };
+                        })
+                        .catch(error => {
+                            console.error(`   ❌ Error eliminando anuncio ${id}:`, error.message);
+                            return {
+                                id,
+                                success: false,
+                                error: error.message
+                            };
+                        });
+                });
+
+                const chunkResults = await Promise.all(chunkPromises);
+                results.push(...chunkResults);
+            }
+            return results;
+        };
+
+        const results = await processInChunks(ids, 5);
 
         const successful = results.filter(r => r.success);
         const failed = results.filter(r => !r.success);

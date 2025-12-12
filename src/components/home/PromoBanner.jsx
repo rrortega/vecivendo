@@ -35,10 +35,8 @@ export const PromoBanner = ({ residentialSlug }) => {
                     Query.orderDesc("fecha_inicio")
                 ];
 
-                if (targetId) {
-                    // User confirmed it's a many-to-many relationship named 'residenciales'
-                    queries.push(Query.equal("residenciales", targetId));
-                }
+                // Attribute 'residencial' does not exist in 'anuncios_pago' schema yet.
+                // queries.push(Query.equal("residencial", targetId));
 
                 try {
                     const response = await databases.listDocuments(
