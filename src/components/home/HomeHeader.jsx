@@ -83,7 +83,7 @@ export const HomeHeader = ({ residencialName, residentialSlug, sortOption, onSor
     return (
         <header
             style={{ top: 'var(--alert-bar-height, 0px)' }}
-            className={`fixed left-0 right-0 z-50 transition-all duration-300 border-b ${isScrolled || isSearchActive
+            className={`relative md:fixed left-0 right-0 z-50 transition-all duration-300 border-b ${isScrolled || isSearchActive
                 ? "bg-surface/80 backdrop-blur-lg border-border"
                 : "bg-transparent border-transparent"
                 }`}

@@ -53,17 +53,15 @@ export default function ResidentialHome({ params }) {
         <div className="min-h-screen bg-background pb-20 md:pb-0 transition-all duration-300" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
             <CommunityAlertBar residentialSlug={residencial} />
 
-            {/* Header - Hidden on mobile when scrolled */}
-            <div className={`transition-transform duration-300 ${isScrolled ? '-translate-y-full md:translate-y-0' : 'translate-y-0'}`}>
-                <HomeHeader
-                    residencialName={residentialName}
-                    residentialSlug={residencial}
-                    sortOption={sortOption}
-                    onSortChange={setSortOption}
-                />
-            </div>
+            {/* Header - Scrolls with page on mobile, fixed on desktop */}
+            <HomeHeader
+                residencialName={residentialName}
+                residentialSlug={residencial}
+                sortOption={sortOption}
+                onSortChange={setSortOption}
+            />
 
-            <div className="max-w-7xl mx-auto pt-20 md:pt-20 md:flex md:px-4 md:gap-6">
+            <div className="max-w-7xl mx-auto pt-4 md:pt-20 md:flex md:px-4 md:gap-6">
                 {/* Sidebar for Desktop */}
                 <CategorySidebar residentialId={residentialData?.$id} />
 

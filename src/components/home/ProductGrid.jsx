@@ -282,7 +282,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
 
             {/* Pagination Controls */}
             {totalItems > 0 && totalPages > 1 && (
-                <div className={`${showFixedPagination ? 'fixed flex' : 'hidden md:flex'} bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-border p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-transform duration-300`}>
+                <div className={`fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-border p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-transform duration-300 ${showFixedPagination ? 'flex' : 'hidden md:flex'}`}>
                     <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-2 text-sm text-text-secondary">
                             <span>Mostrar:</span>
