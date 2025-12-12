@@ -37,10 +37,25 @@ export default function ResidentialHome({ params }) {
     const { residential: residentialData } = useResidential(residencial);
     const [sortOption, setSortOption] = React.useState("recent");
     const [isScrolled, setIsScrolled] = React.useState(false);
+    const [showBottomNav, setShowBottomNav] = React.useState(true);
+    const lastScrollY = React.useRef(0);
 
     React.useEffect(() => {
         const handleScroll = () => {
-            setIsScrolled(window.scrollY > 50);
+            const currentScrollY = window.scrollY;
+
+            setIsScrolled(currentScrollY > 50);
+
+            // Determine scroll direction for Bottom Nav
+            if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+                // Scrolling down - Hide
+                setShowBottomNav(false);
+            } else {
+                // Scrolling up - Show
+                setShowBottomNav(true);
+            }
+
+            lastScrollY.current = currentScrollY;
         };
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
@@ -87,9 +102,10 @@ export default function ResidentialHome({ params }) {
             </div>
 
             {/* Bottom Nav - Always visible on mobile */}
-            <div className="md:hidden">
-                <BottomNav />
-            </div>
+            {/* Bottom Nav - Scroll aware on mobile */}
+            <BottomNav
+                className={`transition-transform duration-300 ${showBottomNav ? 'translate-y-0' : 'translate-y-full'}`}
+            />
         </div>
     );
 }

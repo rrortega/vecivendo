@@ -1,6 +1,3 @@
-
-"use client";
-
 import React, { useEffect, useState } from "react";
 import { client } from "@/lib/appwrite";
 import { Databases } from "appwrite";
@@ -13,7 +10,8 @@ import {
     Shirt,
     Dumbbell,
     Sparkles,
-    Heart
+    Heart,
+    LayoutGrid
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as LucideIcons from "lucide-react";
@@ -32,14 +30,17 @@ const CATEGORY_ICONS = {
 };
 
 export const CategoryChips = ({ residentialId }) => {
-    const { categories } = useCategoryStats(residentialId);
+    const { categories, totalCount } = useCategoryStats(residentialId);
     const router = useRouter();
     const searchParams = useSearchParams();
     const activeCategory = searchParams.get("category");
 
     const handleCategoryClick = (categorySlug) => {
         const params = new URLSearchParams(searchParams);
-        if (activeCategory === categorySlug) {
+        if (categorySlug === null || categorySlug === "") {
+            // "Todas" was clicked
+            params.delete("category");
+        } else if (activeCategory === categorySlug) {
             params.delete("category");
         } else {
             params.set("category", categorySlug);
@@ -54,11 +55,25 @@ export const CategoryChips = ({ residentialId }) => {
 
     if (categories.length === 0) return null;
 
+    // Prepend "Todas" category
+    const allCategories = [
+        {
+            $id: 'todas',
+            nombre: 'Todas',
+            slug: null,
+            icono: 'LayoutGrid',
+            count: totalCount || 0
+        },
+        ...categories
+    ];
+
     return (
         <div className="flex gap-3 overflow-x-auto pb-4 px-4 scrollbar-hide">
-            {categories.map((category) => {
-                const Icon = getIcon(category.icono);
-                const isActive = activeCategory === category.slug;
+            {allCategories.map((category) => {
+                const Icon = category.slug === null ? LayoutGrid : getIcon(category.icono);
+                const isActive = category.slug === null
+                    ? !activeCategory
+                    : activeCategory === category.slug;
 
                 return (
                     <button

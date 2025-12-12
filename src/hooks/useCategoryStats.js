@@ -73,6 +73,9 @@ export const useCategoryStats = (residentialId) => {
                     count: categoryCounts[cat.slug] || 0
                 })).sort((a, b) => b.count - a.count); // Sort by count descending
 
+                // Calculate total count
+                const totalCount = Object.values(categoryCounts).reduce((sum, count) => sum + count, 0);
+
                 setCategories(stats);
 
             } catch (error) {
@@ -85,5 +88,5 @@ export const useCategoryStats = (residentialId) => {
         fetchData();
     }, [residentialId]);
 
-    return { categories, loading };
+    return { categories, loading, totalCount: categories.reduce((sum, cat) => sum + cat.count, 0) };
 };

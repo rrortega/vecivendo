@@ -20,6 +20,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
     const [itemsPerPage] = useState(24);
     const [totalItems, setTotalItems] = useState(0);
     const observerTarget = useRef(null);
+    const productCacheRef = useRef(new Map());
 
     const searchParams = useSearchParams();
     const searchQuery = searchParams.get("search")?.toLowerCase() || "";
@@ -59,7 +60,17 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
 
     useEffect(() => {
         setCurrentPage(1);
-        setProducts([]);
+
+        // Hybrid filtering: show cached results immediately
+        const cacheKey = `${categoryFilter || 'all'}_${searchQuery || 'none'}_${sortOption}`;
+        const cached = productCacheRef.current.get(cacheKey) || [];
+
+        if (cached.length > 0) {
+            setProducts(cached);
+            setLoading(false);
+        } else {
+            setProducts([]);
+        }
     }, [searchQuery, categoryFilter, sortOption]);
 
     useEffect(() => {
@@ -104,10 +115,32 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                     queries
                 );
 
+                // Update cache
+                const cacheKey = `${categoryFilter || 'all'}_${searchQuery || 'none'}_${sortOption}`;
+                const existingCache = productCacheRef.current.get(cacheKey) || [];
+
+                let updatedProducts;
+                if (currentPage === 1) {
+                    updatedProducts = response.documents;
+                } else {
+                    // Merge and deduplicate
+                    const existingIds = new Set(existingCache.map(p => p.$id));
+                    const newProducts = response.documents.filter(p => !existingIds.has(p.$id));
+                    updatedProducts = [...existingCache, ...newProducts];
+                }
+
+                // Update cache with merged results
+                productCacheRef.current.set(cacheKey, updatedProducts);
+
+                // Update displayed products
                 if (currentPage === 1) {
                     setProducts(response.documents);
                 } else {
-                    setProducts(prev => [...prev, ...response.documents]);
+                    setProducts(prev => {
+                        const prevIds = new Set(prev.map(p => p.$id));
+                        const newDocs = response.documents.filter(p => !prevIds.has(p.$id));
+                        return [...prev, ...newDocs];
+                    });
                 }
                 setTotalItems(response.total);
             } catch (error) {
