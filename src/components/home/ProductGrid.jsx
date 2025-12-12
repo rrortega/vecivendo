@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { client } from "@/lib/appwrite";
 import { Databases, Query } from "appwrite";
 import { Heart, ShoppingCart, ImageOff, Search, Loader2 } from "lucide-react";
@@ -11,15 +11,15 @@ import { useSearchParams } from "next/navigation";
 
 import { useFavorites } from "@/hooks/useFavorites";
 
-export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: propResidentialId, sortOption = "recent", showFixedPagination = false }) => {
-    // ... (existing state) ...
+export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: propResidentialId, sortOption = "recent" }) => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isFetching, setIsFetching] = useState(false);
     const [residentialId, setResidentialId] = useState(propResidentialId);
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(24);
+    const [itemsPerPage] = useState(24);
     const [totalItems, setTotalItems] = useState(0);
+    const observerTarget = useRef(null);
 
     const searchParams = useSearchParams();
     const searchQuery = searchParams.get("search")?.toLowerCase() || "";
@@ -57,10 +57,10 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         fetchResidentialId();
     }, [residentialSlug, propResidentialId]);
 
-    // ... (rest of effects) ...
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, categoryFilter, sortOption, itemsPerPage]);
+        setProducts([]);
+    }, [searchQuery, categoryFilter, sortOption]);
 
     useEffect(() => {
         if (!residentialId) return;
@@ -103,7 +103,12 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                     "anuncios",
                     queries
                 );
-                setProducts(response.documents);
+
+                if (currentPage === 1) {
+                    setProducts(response.documents);
+                } else {
+                    setProducts(prev => [...prev, ...response.documents]);
+                }
                 setTotalItems(response.total);
             } catch (error) {
                 console.error("Error fetching products:", error);
@@ -114,7 +119,30 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         };
 
         fetchProducts();
-    }, [residentialId, sortOption, currentPage, itemsPerPage, categoryFilter, searchQuery]);
+    }, [residentialId, sortOption, currentPage, categoryFilter, searchQuery]);
+
+    useEffect(() => {
+        if (loading || isFetching) return;
+
+        const observer = new IntersectionObserver(
+            entries => {
+                if (entries[0].isIntersecting && products.length < totalItems) {
+                    setCurrentPage(prev => prev + 1);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [loading, isFetching, products.length, totalItems]);
 
     // ... (filtering and sorting logic) ...
     const filteredProducts = products
@@ -146,14 +174,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         }).format(price);
     };
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
 
-    const handlePageChange = (newPage) => {
-        if (newPage >= 1 && newPage <= totalPages) {
-            setCurrentPage(newPage);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    };
 
     if (loading) {
         return (
@@ -280,47 +301,10 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 })}
             </div>
 
-            {/* Pagination Controls */}
-            {totalItems > 0 && totalPages > 1 && (
-                <div className={`fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-border p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-transform duration-300 ${showFixedPagination ? 'flex' : 'hidden md:flex'}`}>
-                    <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 text-sm text-text-secondary">
-                            <span>Mostrar:</span>
-                            <select
-                                value={itemsPerPage}
-                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                                className="bg-surface border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value={12}>12 por página</option>
-                                <option value={24}>24 por página</option>
-                                <option value={48}>48 por página</option>
-                                <option value={96}>96 por página</option>
-                            </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1}
-                                className="h-8 px-3"
-                            >
-                                Anterior
-                            </Button>
-                            <span className="text-sm text-text-secondary">
-                                Página {currentPage} de {totalPages}
-                            </span>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                                className="h-8 px-3"
-                            >
-                                Siguiente
-                            </Button>
-                        </div>
-                    </div>
+            {/* Infinite Scroll Loader */}
+            {products.length < totalItems && (
+                <div ref={observerTarget} className="flex justify-center py-8 w-full">
+                    {isFetching && <Loader2 className="w-8 h-8 animate-spin text-primary" />}
                 </div>
             )}
         </div>
