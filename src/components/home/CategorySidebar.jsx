@@ -15,7 +15,8 @@ import {
     Search,
     Package,
     Wrench,
-    Sofa
+    Sofa,
+    LayoutGrid
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as LucideIcons from "lucide-react";
@@ -33,7 +34,7 @@ const CATEGORY_ICONS = {
 };
 
 export const CategorySidebar = ({ residentialId }) => {
-    const { categories } = useCategoryStats(residentialId);
+    const { categories, totalCount } = useCategoryStats(residentialId);
     const router = useRouter();
     const searchParams = useSearchParams();
     const activeCategory = searchParams.get("category");
@@ -95,13 +96,23 @@ export const CategorySidebar = ({ residentialId }) => {
                         params.delete("category");
                         router.replace(`?${params.toString()}`);
                     }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left border border-transparent ${!activeCategory
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all text-left border border-transparent ${!activeCategory
                         ? "bg-primary text-white font-semibold shadow-sm"
                         : "text-text-secondary hover:border-primary hover:text-text-main"
                         }`}
                 >
-                    <Package size={20} />
-                    <span className="text-sm">Todas</span>
+                    <div className="flex items-center gap-3">
+                        <LayoutGrid size={20} />
+                        <span className="text-sm">Todas</span>
+                    </div>
+                    {totalCount > 0 && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${!activeCategory
+                            ? "bg-white/20 text-white"
+                            : "bg-surface-hover text-text-secondary"
+                            }`}>
+                            {totalCount}
+                        </span>
+                    )}
                 </button>
 
                 {/* Category Buttons */}

@@ -336,7 +336,7 @@ export default function AdDetailPage({ params }) {
             <CommunityAlertBar residentialSlug={residencialSlug} />
             <HomeHeader residencialName={residentialName} residentialSlug={residencialSlug} showSearch={false} showFilters={false} />
 
-            <main className="max-w-7xl mx-auto px-4 pt-20 md:pt-24">
+            <main className="max-w-7xl mx-auto px-4 pt-8 md:pt-20">
                 {/* Back Button */}
                 <Link href={`/${residencialSlug}`} className="inline-flex items-center text-text-secondary hover:text-primary mb-6 transition-colors">
                     <ArrowLeft size={20} className="mr-2" />
