@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { databases } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import { useToast } from "@/context/ToastContext";
-import { Search, Filter, Calendar, Building2, Tag, ImageOff, ChevronLeft, ChevronRight, Eye, MousePointer } from "lucide-react";
+import { Search, Filter, Calendar, Building2, Tag, ImageOff, ChevronLeft, ChevronRight, Eye, MousePointer, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import AddButton from "@/components/console/AddButton";
@@ -25,7 +25,7 @@ export default function PaidAdsPage() {
 
     const { showToast } = useToast();
     const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
-    const collectionId = "publicidad"; // Assuming this is the collection name
+    const collectionId = "anuncios_pago";
 
     useEffect(() => {
         fetchAds();
@@ -75,9 +75,14 @@ export default function PaidAdsPage() {
     const handleToggleStatus = async (e, ad) => {
         e.stopPropagation();
         try {
-            await databases.updateDocument(dbId, collectionId, ad.$id, {
-                active: !ad.active
+            const response = await fetch(`/api/paid-ads/${ad.$id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: !ad.active })
             });
+
+            if (!response.ok) throw new Error("Error actualizando estado");
+
             setAds(prev => prev.map(a => a.$id === ad.$id ? { ...a, active: !a.active } : a));
             showToast(`Anuncio ${!ad.active ? 'activado' : 'desactivado'}`, "success");
         } catch (error) {
@@ -85,6 +90,8 @@ export default function PaidAdsPage() {
             showToast("Error al cambiar estado", "error");
         }
     };
+
+
 
     const totalPages = Math.ceil(total / limit);
 
@@ -147,11 +154,10 @@ export default function PaidAdsPage() {
                             <tr>
                                 <th className="px-4 py-3 w-16">Imagen</th>
                                 <th className="px-4 py-3">Título</th>
-                                <th className="px-4 py-3">Cliente</th>
-                                <th className="px-4 py-3 text-center">Estado</th>
                                 <th className="px-4 py-3 text-center">Vistas</th>
                                 <th className="px-4 py-3 text-center">Clicks</th>
                                 <th className="px-4 py-3">Fecha</th>
+                                <th className="px-4 py-3 text-center">Estado</th>
                                 <th className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -187,9 +193,9 @@ export default function PaidAdsPage() {
                                     >
                                         <td className="px-4 py-2">
                                             <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-900 border admin-border flex-shrink-0">
-                                                {ad.imagen ? (
+                                                {ad.image_url ? (
                                                     <img
-                                                        src={ad.imagen}
+                                                        src={ad.image_url}
                                                         alt=""
                                                         className="w-full h-full object-cover"
                                                     />
@@ -204,19 +210,6 @@ export default function PaidAdsPage() {
                                             <div className="line-clamp-1 max-w-[200px]" title={ad.titulo}>
                                                 {ad.titulo}
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
-                                            {ad.cliente || "N/A"}
-                                        </td>
-                                        <td className="px-4 py-2 text-center">
-                                            <button
-                                                onClick={(e) => handleToggleStatus(e, ad)}
-                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${ad.active ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`}
-                                            >
-                                                <span
-                                                    className={`${ad.active ? 'translate-x-4' : 'translate-x-1'} inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform`}
-                                                />
-                                            </button>
                                         </td>
                                         <td className="px-4 py-2 text-center admin-text-muted">
                                             <div className="flex items-center justify-center gap-1">
@@ -233,13 +226,25 @@ export default function PaidAdsPage() {
                                         <td className="px-4 py-2 admin-text-muted whitespace-nowrap text-xs">
                                             {new Date(ad.$createdAt).toLocaleDateString()}
                                         </td>
-                                        <td className="px-4 py-2 text-right">
+                                        <td className="px-4 py-2 text-center">
                                             <button
-                                                className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                                                title="Ver detalles"
+                                                onClick={(e) => handleToggleStatus(e, ad)}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${ad.active ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`}
                                             >
-                                                <ChevronRight size={18} />
+                                                <span
+                                                    className={`${ad.active ? 'translate-x-4' : 'translate-x-1'} inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform`}
+                                                />
                                             </button>
+                                        </td>
+                                        <td className="px-4 py-2 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+                                                    title="Ver detalles"
+                                                >
+                                                    <ChevronRight size={18} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

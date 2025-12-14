@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { Building2, Plus, Search } from "lucide-react";
 import { Query } from "node-appwrite";
 import AddButton from "@/components/console/AddButton";
+import Link from "next/link";
 import ConfirmModal from "@/components/console/ConfirmModal";
 
 export default function ResidentialsPage() {
@@ -63,8 +64,9 @@ export default function ResidentialsPage() {
             key: "name",
             label: "Nombre",
             render: (value, row) => (
-                <div
-                    onClick={() => router.push(`/console/residentials/${row.$id}`)}
+                <Link
+                    href={`/console/residentials/${row.$id}`}
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-3 cursor-pointer group"
                 >
                     <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg group-hover:bg-primary-100 dark:group-hover:bg-primary-900/30 transition-colors">
@@ -73,7 +75,7 @@ export default function ResidentialsPage() {
                     <span className="font-medium admin-text dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                         {value}
                     </span>
-                </div>
+                </Link>
             )
         },
         { key: "country", label: "País" },
@@ -149,6 +151,7 @@ export default function ResidentialsPage() {
                         className: "text-blue-600 hover:text-blue-800"
                     }
                 ]}
+                onRowClick={(item) => router.push(`/console/residentials/${item.$id}`)}
                 isLoading={loading}
             />
 

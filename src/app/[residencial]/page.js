@@ -2,7 +2,6 @@
 
 import React from "react";
 import { HomeHeader } from "@/components/home/HomeHeader";
-import { PromoBanner } from "@/components/home/PromoBanner";
 import { CategoryChips } from "@/components/home/CategoryChips";
 import { ProductGrid } from "@/components/home/ProductGrid";
 import { BottomNav } from "@/components/ui/BottomNav";
@@ -81,7 +80,7 @@ export default function ResidentialHome({ params }) {
                 <CategorySidebar residentialId={residentialData?.$id} />
 
                 <main className="flex-1 min-w-0">
-                    <PromoBanner residentialSlug={residencial} />
+                    {/* Banner ads are now handled inside ProductGrid */}
 
                     {/* Mobile Category Chips - Sticky on scroll */}
                     <div className="md:hidden">

@@ -9,12 +9,20 @@ export default function ImageUpload({
     onChange,
     bucketId = 'images',
     label = 'Imagen',
-    className = ''
+    className = '',
+    variant = 'standard' // standard, banner, square
 }) {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState(null);
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef(null);
+
+    // Determine height/aspect classes
+    const getContainerClasses = () => {
+        if (variant === 'square') return 'aspect-square w-full max-w-[500px] mx-auto';
+        if (variant === 'banner') return 'h-64 w-full';
+        return value ? 'h-64' : 'h-40';
+    };
 
     const handleFile = async (file) => {
         if (!file) return;
@@ -78,15 +86,18 @@ export default function ImageUpload({
         }
     };
 
-    const handleDelete = async (e) => {
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    const checkDelete = (e) => {
         e.preventDefault();
         e.stopPropagation();
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        setShowDeleteConfirm(false);
 
         if (!value) return;
-
-        if (!confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
-            return;
-        }
 
         try {
             setUploading(true);
@@ -111,6 +122,12 @@ export default function ImageUpload({
         } finally {
             setUploading(false);
         }
+    };
+
+    const cancelDelete = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowDeleteConfirm(false);
     };
 
     const handleDrag = (e) => {
@@ -148,7 +165,7 @@ export default function ImageUpload({
 
             <div
                 className={`relative group cursor-pointer transition-all duration-200 ease-in-out
-                    ${value ? 'h-64' : 'h-40'} 
+                    ${getContainerClasses()} 
                     rounded-xl border-2 border-dashed
                     ${dragActive ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10' : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500'}
                     ${error ? 'border-red-500' : ''}
@@ -187,7 +204,7 @@ export default function ImageUpload({
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={handleDelete}
+                                    onClick={checkDelete}
                                     className="p-2 bg-white/90 rounded-full text-gray-700 hover:text-red-600 hover:bg-white transition-all shadow-lg"
                                     title="Eliminar imagen"
                                 >
@@ -225,12 +242,45 @@ export default function ImageUpload({
                 />
             </div>
 
-            {error && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 animate-in slide-in-from-top-1">
-                    <X size={14} />
-                    <span>{error}</span>
-                </div>
-            )}
-        </div>
+            {
+                error && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 animate-in slide-in-from-top-1">
+                        <X size={14} />
+                        <span>{error}</span>
+                    </div>
+                )
+            }
+
+            {/* Custom Confirmation Modal */}
+            {
+                showDeleteConfirm && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-xl animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-xl max-w-sm w-full text-center border admin-border">
+                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-3 text-red-600 dark:text-red-400">
+                                <Trash2 size={24} />
+                            </div>
+                            <h4 className="text-lg font-semibold admin-text mb-1">¿Eliminar imagen?</h4>
+                            <p className="text-sm admin-text-muted mb-4">Esta acción no se puede deshacer.</p>
+                            <div className="flex gap-2 justify-center">
+                                <button
+                                    type="button"
+                                    onClick={cancelDelete}
+                                    className="px-4 py-2 rounded-lg border admin-border text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={confirmDelete}
+                                    className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors text-sm font-medium"
+                                >
+                                    Sí, eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }

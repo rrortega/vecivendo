@@ -5,7 +5,7 @@ const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 const LOGS_COLLECTION_ID = "logs";
 
 // Helper to get or create a session ID
-const getSessionId = () => {
+export const getSessionId = () => {
     if (typeof window === 'undefined') return null;
     let sessionId = localStorage.getItem('vecivendo_session_id');
     if (!sessionId) {
@@ -114,7 +114,7 @@ export const logAdView = async (adId, isPaidAd = false, user = null, type = 'vie
     }
 };
 
-export const getAdAnalytics = async (adId) => {
+export const getAdAnalytics = async (adId, isPaidAd = false) => {
     try {
         // Fetch logs for this ad
         // Note: For high volume, we should rely on Appwrite's aggregation or a separate stats collection.
@@ -125,7 +125,7 @@ export const getAdAnalytics = async (adId) => {
             DB_ID,
             LOGS_COLLECTION_ID,
             [
-                Query.equal("anuncioId", adId),
+                Query.equal(isPaidAd ? "anuncioPagoId" : "anuncioId", adId),
                 Query.equal("type", "view"), // Only count views for general stats
                 Query.limit(1000)
             ]

@@ -19,6 +19,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { useResidential } from "@/hooks/useResidential";
 import { Clock } from "lucide-react";
 import { AdDetailSkeleton } from "@/components/skeletons/AdDetailSkeleton";
+import PaidAdCard from "@/components/ads/PaidAdCard";
 
 export default function AdDetailPage({ params }) {
     const { residencial: residencialSlug, id: adId, variant_slug } = params;
@@ -27,12 +28,13 @@ export default function AdDetailPage({ params }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [ad, setAd] = useState(null);
-    const [relatedAds, setRelatedAds] = useState([]);
+    const [relatedAds, setRelatedAds] = useState([]); // This now holds mixed types
     const [quantity, setQuantity] = useState(1);
     const [selectedImage, setSelectedImage] = useState(0);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
     const [advertiserInfo, setAdvertiserInfo] = useState(null);
+    // crossPromoAd state removed
 
     // Variant state
     const [variants, setVariants] = useState([]);
@@ -147,8 +149,12 @@ export default function AdDetailPage({ params }) {
                         .catch(err => console.error("Error looking up advertiser:", err));
                 }
 
-                // ASYNC: Fetch Related Ads
+                // ASYNC: Fetch Related Ads & Cross Promo
                 (async () => {
+                    let relatedList = [];
+                    let crossList = [];
+
+                    // 1. Fetch Related (Same Advertiser)
                     let queryField = null;
                     let queryValue = null;
 
@@ -160,18 +166,44 @@ export default function AdDetailPage({ params }) {
 
                     if (queryField && queryValue) {
                         try {
-                            const relatedList = await databases.listDocuments(
+                            const res = await databases.listDocuments(
                                 dbId, "anuncios",
                                 [
                                     Query.equal(queryField, queryValue),
                                     Query.equal("activo", true),
                                     Query.notEqual("$id", adId),
-                                    Query.limit(4)
+                                    Query.limit(6)
                                 ]
                             );
-                            setRelatedAds(relatedList.documents);
+                            relatedList = res.documents.map(doc => ({ ...doc, isPaid: false }));
                         } catch (e) { console.error("Error fetching related:", e); }
                     }
+
+                    // 2. Fetch Cross Promo Ads (Matching Category)
+                    try {
+                        const categorySlug = adData.categoria_slug || adData.categoria || '';
+                        if (categorySlug) {
+                            const params = new URLSearchParams({
+                                type: 'cross',
+                                limit: '4', // Fetch a few to mix in
+                                category: categorySlug
+                            });
+                            const res = await fetch(`/api/paid-ads/public?${params}`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                crossList = (data.documents || []).map(doc => ({ ...doc, isPaid: true }));
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error fetching cross promo ads:", e);
+                    }
+
+                    // 3. Mix lists
+                    // Simple mix: Alternate or append?
+                    // "mezclamos los otros anuncios... con la publicidad de tipo cross"
+                    // Let's create a combined list, shuffled or interleaved.
+                    const combined = [...relatedList, ...crossList].sort(() => Math.random() - 0.5);
+                    setRelatedAds(combined);
                 })();
 
 
@@ -180,6 +212,7 @@ export default function AdDetailPage({ params }) {
                     logAdView(adData.$id, false, null, "view");
                 });
 
+                // Removed standalone CrossPromoAd fetch as it's now integrated
             } catch (err) {
                 console.error("Error fetching ad data:", err);
                 setError("No pudimos cargar la información del anuncio.");
@@ -534,13 +567,27 @@ export default function AdDetailPage({ params }) {
                     </div>
                 </div>
 
-                {/* Related Products */}
+
+                {/* Related Products & Cross Promo Mixed */}
                 {
                     relatedAds.length > 0 && (
                         <div className="mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-forwards">
-                            <h2 className="text-2xl font-bold text-text-main mb-6">Más anuncios de este anunciante</h2>
+                            <h2 className="text-2xl font-bold text-text-main mb-6">También podría interesarte...</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {relatedAds.map(related => {
+                                {relatedAds.map(item => {
+                                    if (item.isPaid) {
+                                        return (
+                                            <PaidAdCard
+                                                key={item.$id}
+                                                ad={item}
+                                                residentialSlug={residencialSlug}
+                                                viewMode="grid"
+                                                currency={item.moneda || 'MXN'}
+                                            />
+                                        );
+                                    }
+
+                                    const related = item;
                                     const relatedImages = related.imagenes || [];
                                     const firstImage = relatedImages[0];
 

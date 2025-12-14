@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Query } from "appwrite"; // ID removed
 import VariantsManager from "@/components/console/ads/VariantsManager";
 import ConfirmModal from "@/components/console/ConfirmModal";
+import ImageUploader from "@/components/console/ads/ImageUploader";
 
 
 export default function AdEditForm({ ad }) {
@@ -101,20 +102,7 @@ export default function AdEditForm({ ad }) {
         }));
     };
 
-    const handleImageChange = (index, value) => {
-        const newImages = [...formData.imagenes];
-        newImages[index] = value;
-        setFormData(prev => ({ ...prev, imagenes: newImages }));
-    };
 
-    const addImageField = () => {
-        setFormData(prev => ({ ...prev, imagenes: [...prev.imagenes, ""] }));
-    };
-
-    const removeImageField = (index) => {
-        const newImages = formData.imagenes.filter((_, i) => i !== index);
-        setFormData(prev => ({ ...prev, imagenes: newImages }));
-    };
 
     const isValidUrl = (string) => {
         try {
@@ -372,37 +360,16 @@ export default function AdEditForm({ ad }) {
                     {activeTab === 'images' && (
                         <div className="space-y-6">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium admin-text">URLs de Imágenes o Videos</label>
-                                <div className="space-y-3">
-                                    {formData.imagenes.map((url, index) => (
-                                        <div key={index} className="flex gap-2">
-                                            <input
-                                                type="url"
-                                                value={url}
-                                                onChange={(e) => handleImageChange(index, e.target.value)}
-                                                placeholder="https://ejemplo.com/imagen.jpg"
-                                                className={`flex-1 px-4 py-2 rounded-lg border ${url && !isValidUrl(url) ? 'border-red-500 focus:ring-red-500' : 'admin-border focus:ring-primary-500'} admin-bg admin-text focus:ring-2 outline-none`}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeImageField(index)}
-                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                            >
-                                                <Trash2 size={20} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <button
-                                        type="button"
-                                        onClick={addImageField}
-                                        className="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium"
-                                    >
-                                        + Agregar otra imagen
-                                    </button>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-sm font-medium admin-text">Galería de Imágenes</label>
+                                    <span className="text-xs admin-text-muted">{formData.imagenes.length} imágenes</span>
                                 </div>
+                                <ImageUploader
+                                    images={formData.imagenes}
+                                    onChange={(newImages) => setFormData(prev => ({ ...prev, imagenes: newImages }))}
+                                    adId={ad?.$id}
+                                />
                             </div>
-
-
                         </div>
                     )}
 
