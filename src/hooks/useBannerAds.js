@@ -83,14 +83,38 @@ export function useBannerAds({ category = null, residentialId = null } = {}) {
             bannerCache.category = category;
             bannerCache.residentialId = residentialId;
 
-            setBanners(fetchedBanners);
+            // Filter out clicked banners
+            let displayBanners = fetchedBanners;
+            if (typeof window !== 'undefined') {
+                const today = new Date().setHours(0, 0, 0, 0);
+                displayBanners = fetchedBanners.filter(ad => {
+                    const clickedTime = localStorage.getItem(`ad_clicked_${ad.$id}`);
+                    if (!clickedTime) return true;
+
+                    const clickedDate = new Date(parseInt(clickedTime)).setHours(0, 0, 0, 0);
+                    return clickedDate !== today;
+                });
+            }
+
+            setBanners(displayBanners);
         } catch (err) {
             console.error('Error fetching banner ads:', err);
             setError(err.message);
 
             // Use stale cache if available
             if (bannerCache.data) {
-                setBanners(bannerCache.data);
+                // Also filter stale cache
+                let displayBanners = bannerCache.data;
+                if (typeof window !== 'undefined') {
+                    const today = new Date().setHours(0, 0, 0, 0);
+                    displayBanners = bannerCache.data.filter(ad => {
+                        const clickedTime = localStorage.getItem(`ad_clicked_${ad.$id}`);
+                        if (!clickedTime) return true;
+                        const clickedDate = new Date(parseInt(clickedTime)).setHours(0, 0, 0, 0);
+                        return clickedDate !== today;
+                    });
+                }
+                setBanners(displayBanners);
             }
         } finally {
             setLoading(false);

@@ -29,7 +29,7 @@ function calculateDailyBudget(ad) {
 /**
  * Get today's spending for an ad
  */
-async function getTodaySpending(adId) {
+async function getTodaySpending(adId, costPerView = CREDIT_COST_VIEW, costPerClick = CREDIT_COST_CLICK) {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -55,7 +55,7 @@ async function getTodaySpending(adId) {
             const stats = statsResponse.documents[0];
             const views = stats.views || 0;
             const clicks = stats.clicks || 0;
-            return (views * CREDIT_COST_VIEW) + (clicks * CREDIT_COST_CLICK);
+            return (views * costPerView) + (clicks * costPerClick);
         }
 
         return 0;
@@ -106,20 +106,35 @@ export async function GET(request) {
 
         let ads = response.documents;
 
-        // Filter by category
+
+        // Filter by category logic:
+        // 1. If we are filtering by a category (category param exists):
+        //    - Show ads with NO categories (global/all)
+        //    - Show ads that match the specific category
+        // 2. If we are NOT filtering (viewing all/home):
+        //    - Show ONLY ads with NO categories (global/all)
+        //    - Do NOT show ads that are targeted to specific categories
+
         if (category) {
             ads = ads.filter(ad => {
-                // If no categories specified, show to all
+                // Show global ads (no categories)
                 if (!ad.categorias && !ad.categories) return true;
                 const cats = ad.categorias || ad.categories || [];
                 if (cats.length === 0) return true;
 
+                // Show matching ads
                 return cats.some(cat => {
                     if (typeof cat === 'object' && cat.slug) {
                         return cat.slug === category;
                     }
                     return cat === category;
                 });
+            });
+        } else {
+            // Viewing generic list - only show global ads
+            ads = ads.filter(ad => {
+                const cats = ad.categorias || ad.categories || [];
+                return cats.length === 0;
             });
         }
 
@@ -150,7 +165,12 @@ export async function GET(request) {
                 continue;
             }
 
-            const todaySpent = await getTodaySpending(ad.$id);
+            // Get dynamic costs from ad attributes or use defaults
+            // Defaults: 1 credit per view, 5 credits per click
+            const costPerView = ad.costo_por_vista || CREDIT_COST_VIEW;
+            const costPerClick = ad.costo_por_click || CREDIT_COST_CLICK;
+
+            const todaySpent = await getTodaySpending(ad.$id, costPerView, costPerClick);
 
             // Only include if daily budget not exceeded
             if (todaySpent < dailyBudget) {

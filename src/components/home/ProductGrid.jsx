@@ -95,8 +95,21 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 const res = await fetch(`/api/paid-ads/public?${params.toString()}`);
                 if (res.ok) {
                     const data = await res.json();
+                    let docs = data.documents || [];
+
+                    // Filter out clicked embedded ads
+                    if (typeof window !== 'undefined') {
+                        const today = new Date().setHours(0, 0, 0, 0);
+                        docs = docs.filter(ad => {
+                            const clickedTime = localStorage.getItem(`ad_clicked_${ad.$id}`);
+                            if (!clickedTime) return true;
+                            const clickedDate = new Date(parseInt(clickedTime)).setHours(0, 0, 0, 0);
+                            return clickedDate !== today;
+                        });
+                    }
+
                     // Shuffle for random display
-                    const shuffled = (data.documents || []).sort(() => Math.random() - 0.5);
+                    const shuffled = docs.sort(() => Math.random() - 0.5);
                     setEmbeddedAds(shuffled);
                 }
             } catch (error) {
@@ -288,10 +301,10 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 </div>
             )}
 
-            {/* Top Banner Carousel */}
+            {/* Top Banner Carousel - Only first 5 */}
             {bannerAds.length > 0 && (
                 <BannerCarousel
-                    banners={bannerAds}
+                    banners={bannerAds.slice(0, 5)}
                     residentialSlug={residentialSlug}
                 />
             )}
@@ -301,14 +314,45 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 : "flex flex-col gap-4 px-4 w-full"
             }>
                 {filteredProducts.map((product, index) => {
-                    // Insert embedded ad every 6 free ads (adjusted for better distribution)
-                    const embeddedAdIndex = Math.floor(index / 6);
-                    const shouldInsertEmbeddedAd = (index + 1) % 6 === 0 && embeddedAds.length > 0;
-                    const embeddedAd = shouldInsertEmbeddedAd ? embeddedAds[embeddedAdIndex % embeddedAds.length] : null;
+                    // Logic for Embedded Ads:
+                    // Insert at pos 6, 12, 18... (1-based index) -> after index 5, 11, 17...
+                    // Do not repeat ads. Stop if we run out.
+                    // Filter out clicked ads (logic handles this via state, but we ensure here too)
 
-                    // Insert banner every 12 free ads (in addition to top banner)
-                    const bannerIndex = Math.floor(index / 12);
-                    const shouldInsertBanner = (index + 1) % 12 === 0 && bannerAds.length > 0 && index > 0;
+                    const shouldInsertEmbeddedAd = (index + 1) % 6 === 0;
+                    let embeddedAd = null;
+
+                    if (shouldInsertEmbeddedAd && embeddedAds.length > 0) {
+                        const embeddedAdIndex = Math.floor(index / 6);
+                        // Only show if we have enough unique ads
+                        if (embeddedAdIndex < embeddedAds.length) {
+                            embeddedAd = embeddedAds[embeddedAdIndex];
+                        }
+                    }
+
+                    // Logic for Banner Ads (Secondary Carousels):
+                    // "Si hay mas de 5 banner publicitarios hay que poner un segundo caroucel a los 16 elementos siguientes..."
+                    // "si hay mas de 10 banner repetimos el proceso cada 16 elementos"
+                    // Interpretation:
+                    // - Top carousel: Banners 0-4 (Already handled above outside this loop)
+                    // - After product 16: Banners 5-9
+                    // - After product 32: Banners 10-14
+                    // - etc.
+
+                    const shouldInsertBanner = (index + 1) % 16 === 0;
+                    let bannersForCarousel = null;
+
+                    if (shouldInsertBanner && bannerAds.length > 5) {
+                        const carouselGroupIndex = ((index + 1) / 16); // 1, 2, 3...
+                        const startIndex = carouselGroupIndex * 5;
+                        const endIndex = startIndex + 5;
+
+                        // Check if we have banners for this slot
+                        if (startIndex < bannerAds.length) {
+                            bannersForCarousel = bannerAds.slice(startIndex, endIndex);
+                        }
+                    }
+
 
                     let adLink = `/${residentialSlug}/anuncio/${product.$id}`;
                     if (product.variants && product.variants.length > 0) {
@@ -394,7 +438,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                 </div>
                             </Link>
 
-                            {/* Insert Embedded Ad after every 6 products */}
+                            {/* Insert Embedded Ad (Non-repeating) */}
                             {embeddedAd && (
                                 <PaidAdCard
                                     ad={embeddedAd}
@@ -404,11 +448,11 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                 />
                             )}
 
-                            {/* Insert Banner Ad after every 12 products */}
-                            {shouldInsertBanner && (
+                            {/* Insert Banner Ad Carousel (Batches of 5, every 16 items) */}
+                            {bannersForCarousel && bannersForCarousel.length > 0 && (
                                 <div className={viewMode === "grid" ? "col-span-full" : "w-full"}>
                                     <BannerCarousel
-                                        banners={[bannerAds[bannerIndex % bannerAds.length]]}
+                                        banners={bannersForCarousel}
                                         residentialSlug={residentialSlug}
                                     />
                                 </div>

@@ -77,6 +77,9 @@ export default function BannerCarousel({ banners = [], residentialSlug }) {
         if (!adId) return;
 
         try {
+            // Record in localStorage immediately to hide it on next render
+            localStorage.setItem(`ad_clicked_${adId}`, Date.now().toString());
+
             await fetch('/api/paid-ads/track', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -124,8 +127,15 @@ export default function BannerCarousel({ banners = [], residentialSlug }) {
     }, [currentBanner?.$id, trackView]);
 
     // Auto-rotation
+    // Rotation state
+    const [isHovered, setIsHovered] = useState(false);
+    const [isClickPaused, setIsClickPaused] = useState(false);
+    const clickPauseTimerRef = useRef(null);
+
+    // Auto-rotation
     useEffect(() => {
         if (banners.length <= 1) return;
+        if (isHovered || isClickPaused) return;
 
         rotationTimerRef.current = setInterval(() => {
             setIsTransitioning(true);
@@ -140,7 +150,22 @@ export default function BannerCarousel({ banners = [], residentialSlug }) {
                 clearInterval(rotationTimerRef.current);
             }
         };
-    }, [banners.length]);
+    }, [banners.length, isHovered, isClickPaused]);
+
+    // Handle interaction pause logic
+    const handleMouseEnter = () => setIsHovered(true);
+    const handleMouseLeave = () => setIsHovered(false);
+
+    const handleClickPause = () => {
+        setIsClickPaused(true);
+        // Clear existing timer if any
+        if (clickPauseTimerRef.current) clearTimeout(clickPauseTimerRef.current);
+
+        // Resume after 20 seconds
+        clickPauseTimerRef.current = setTimeout(() => {
+            setIsClickPaused(false);
+        }, 20000);
+    };
 
     // Navigate to specific banner
     const goToSlide = (index) => {
@@ -212,7 +237,12 @@ export default function BannerCarousel({ banners = [], residentialSlug }) {
             <div
                 ref={carouselRef}
                 className="relative mx-4 my-4 rounded-2xl overflow-hidden shadow-lg group"
-                onClick={handleMobileTap}
+                onClick={(e) => {
+                    handleMobileTap(e);
+                    handleClickPause();
+                }}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
             >
                 {/* Banner content */}
                 <a
@@ -304,8 +334,8 @@ export default function BannerCarousel({ banners = [], residentialSlug }) {
                                 key={idx}
                                 onClick={(e) => { e.stopPropagation(); goToSlide(idx); }}
                                 className={`w-2 h-2 rounded-full transition-all ${idx === currentIndex
-                                        ? 'bg-white w-4'
-                                        : 'bg-white/50 hover:bg-white/80'
+                                    ? 'bg-white w-4'
+                                    : 'bg-white/50 hover:bg-white/80'
                                     }`}
                                 aria-label={`Ir al banner ${idx + 1}`}
                             />
