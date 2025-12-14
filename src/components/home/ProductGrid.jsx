@@ -23,6 +23,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
     const observerTarget = useRef(null);
     const productCacheRef = useRef(new Map());
     const fetchingRef = useRef(false); // Prevent duplicate fetches
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Embedded Ads State
     const [embeddedAds, setEmbeddedAds] = useState([]);
@@ -122,6 +123,29 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         }
     }, [categoryFilter, residentialId]);
 
+    // Load cached products immediately on mount or filter change
+    useEffect(() => {
+        // Only use cache for initial load or simple filters to avoid complexity
+        if (currentPage === 1) {
+            const cacheKey = `products_cache_${residentialId}_${categoryFilter || 'all'}_${searchQuery || 'none'}_${sortOption}`;
+            const cachedData = localStorage.getItem(cacheKey);
+
+            if (cachedData) {
+                try {
+                    const parsed = JSON.parse(cachedData);
+                    // Check if cache is strictly valid (optional: add timestamp check)
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setProducts(parsed);
+                        setLoading(false);
+                        // We will still fetch fresh data below, but UI is populated.
+                    }
+                } catch (e) {
+                    console.error("Error parsing product cache: ", e);
+                }
+            }
+        }
+    }, [residentialId, categoryFilter, searchQuery, sortOption, currentPage]);
+
     useEffect(() => {
         if (!residentialId || !hasMoreItems) return;
         if (fetchingRef.current) return; // Prevent duplicate fetches
@@ -129,8 +153,12 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         const fetchProducts = async () => {
             fetchingRef.current = true;
 
-            if (products.length === 0) {
-                setLoading(true);
+            if (products.length === 0 && currentPage === 1) {
+                // If we didn't have cache processed above, show loading
+                // But we might have just mounted and useEffect above ran.
+                // Let's rely on 'loading' state being true initially.
+                // If cache hit, loading is false, so we don't show skeleton.
+                // But we still want to show a small indicator or just replace content silently.
             } else {
                 setIsFetching(true);
             }
@@ -168,26 +196,14 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                     setHasMoreItems(false);
                 }
 
-                // Update cache
-                const cacheKey = `${categoryFilter || 'all'}_${searchQuery || 'none'}_${sortOption}`;
-                const existingCache = productCacheRef.current.get(cacheKey) || [];
-
+                // Update cache logic
                 let updatedProducts;
                 if (currentPage === 1) {
                     updatedProducts = newDocs;
-                } else {
-                    // Merge and deduplicate
-                    const existingIds = new Set(existingCache.map(p => p.$id));
-                    const newProducts = newDocs.filter(p => !existingIds.has(p.$id));
-                    updatedProducts = [...existingCache, ...newProducts];
-                }
 
-                // Update cache with merged results
-                productCacheRef.current.set(cacheKey, updatedProducts);
-
-                // Update displayed products
-                if (currentPage === 1) {
-                    setProducts(newDocs);
+                    // Save to local storage for offline use
+                    const cacheKey = `products_cache_${residentialId}_${categoryFilter || 'all'}_${searchQuery || 'none'}_${sortOption}`;
+                    localStorage.setItem(cacheKey, JSON.stringify(newDocs));
                 } else {
                     setProducts(prev => {
                         const prevIds = new Set(prev.map(p => p.$id));
@@ -195,6 +211,12 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                         return [...prev, ...deduped];
                     });
                 }
+
+                // Update displayed products (for page 1)
+                if (currentPage === 1) {
+                    setProducts(newDocs);
+                }
+
                 setTotalItems(total);
             } catch (error) {
                 console.error("Error fetching products:", error);
@@ -207,7 +229,40 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
         };
 
         fetchProducts();
-    }, [residentialId, sortOption, currentPage, categoryFilter, searchQuery, hasMoreItems]);
+    }, [residentialId, sortOption, currentPage, categoryFilter, searchQuery, hasMoreItems, refreshTrigger]);
+
+    // Revalidate on online
+    useEffect(() => {
+        const handleOnline = () => {
+            console.log("Online connection restored. Refreshing products...");
+            // Simple way to trigger refetch: clear list and reset page to 1, effectively a hard refresh
+            // Or better: ensure we fetch page 1 again.
+            // Given the structure, if we reset currentPage to 1, it might trigger the effect.
+            // But if it's already 1, it won't.
+            // Let's force a reload by clearing products and resetting page.
+            productCacheRef.current.clear(); // Clear cache to ensure fresh data
+            setProducts([]);
+            setHasMoreItems(true);
+            setCurrentPage(1);
+            setTotalItems(0);
+            fetchingRef.current = false;
+            // The main useEffect depends on currentPage, so setting it to 1 (even if it was 1) 
+            // might not trigger if value is same. But clearing query params or toggling a boolean would.
+            // If we empty products, the effect "if (products.length === 0)" condition might help, 
+            // but `currentPage` dependency is key.
+
+            // Trick: If `currentPage` is 1, `setCurrentPage(1)` does nothing.
+            // But if we have a separate "version" or "refreshKey" state in dependency, it runs.
+            // Let's rely on the fact that `products.length` change (to 0) isn't in dependency.
+            // But `fetchProducts` is called inside `useEffect`.
+
+            // Safer approach: define a refresh trigger.
+            setRefreshTrigger(prev => prev + 1);
+        };
+
+        window.addEventListener('online', handleOnline);
+        return () => window.removeEventListener('online', handleOnline);
+    }, []);
 
     // Intersection Observer for infinite scroll
     useEffect(() => {
@@ -384,10 +439,10 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                         <React.Fragment key={product.$id}>
                             <Link
                                 href={adLink}
-                                className={`group bg-surface rounded-xl overflow-hidden border border-gray-200 dark:border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${viewMode === "list" ? "flex flex-row h-40 md:h-48" : ""
+                                className={`group bg-surface rounded-xl overflow-hidden border border-gray-200 dark:border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative ${viewMode === "list" ? "flex flex-row h-40 md:h-48" : "aspect-[3/4]"
                                     }`}
                             >
-                                <div className={`${viewMode === "list" ? "w-40 md:w-56 shrink-0" : "aspect-[4/3]"} relative overflow-hidden bg-gray-100 dark:bg-white/5`}>
+                                <div className={`${viewMode === "list" ? "w-40 md:w-56 shrink-0 relative" : "absolute inset-0 z-0"} overflow-hidden bg-gray-100 dark:bg-white/5`}>
                                     {(() => {
                                         const images = product.imagenes || [];
                                         const firstImage = Array.isArray(images) ? images[0] : null;
@@ -395,7 +450,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                             <img
                                                 src={firstImage}
                                                 alt={product.titulo}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 block"
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-text-secondary">
@@ -405,7 +460,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                     })()}
                                     <button
                                         onClick={(e) => toggleFavorite(e, product.$id)}
-                                        className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-sm transition-all shadow-sm duration-200 ${isFavorite(product.$id)
+                                        className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-sm transition-all shadow-sm duration-200 z-20 ${isFavorite(product.$id)
                                             ? "bg-white text-red-500 opacity-100 scale-110"
                                             : "bg-white/80 text-gray-600 hover:text-red-500 border border-transparent hover:border-red-500 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
                                             }`}
@@ -413,27 +468,58 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                         <Heart size={18} fill={isFavorite(product.$id) ? "currentColor" : "none"} />
                                     </button>
                                 </div>
-                                <div className={`p-3 ${viewMode === "list" ? "flex flex-col flex-1 justify-between p-4" : ""}`}>
+
+                                {/* Category Badge - Changed to Top Left */}
+                                {product.categoria && viewMode === "grid" && (
+                                    <div className="absolute top-2 left-2 z-20">
+                                        <span className="inline-block px-2 py-1 text-[10px] font-medium bg-surface/90 backdrop-blur-md text-text-main rounded-md shadow-sm border border-border/50">
+                                            {product.categoria}
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className={`
+                                    ${viewMode === "list"
+                                        ? "p-4 flex flex-col flex-1 justify-between relative"
+                                        : "absolute bottom-0 left-0 right-0 z-10 p-4 pt-20 bg-gradient-to-t from-white via-white/60 to-transparent dark:from-zinc-950 dark:via-zinc-950/60 dark:to-transparent"
+                                    }
+                                `}>
                                     <div className="flex items-start justify-between gap-2 mb-1">
-                                        <h3 className={`font-medium text-text-main leading-tight group-hover:text-primary transition-colors ${viewMode === "list" ? "text-lg line-clamp-2" : "text-sm line-clamp-2"}`}>
+                                        <h3 className={`font-medium leading-tight transition-colors ${viewMode === "list"
+                                            ? "text-lg line-clamp-2 text-text-main group-hover:text-primary"
+                                            : "text-base line-clamp-2 text-gray-900 dark:text-gray-100 group-hover:text-primary dark:group-hover:text-primary-300 shadow-sm"
+                                            }`}>
                                             {product.titulo}
                                         </h3>
                                     </div>
+
+                                    {/* Category in list view only (handled above for grid) */}
+                                    {product.categoria && viewMode === "list" && (
+                                        <p className="text-xs mb-1 text-text-secondary">
+                                            {product.categoria}
+                                        </p>
+                                    )}
+
                                     {viewMode === "list" && (
                                         <p className="text-sm text-text-secondary line-clamp-2 mb-2 hidden md:block">
                                             {product.descripcion}
                                         </p>
                                     )}
-                                    <div className="flex items-end justify-between mt-2">
+                                    <div className="flex items-end justify-between mt-1">
                                         <div className="flex flex-col">
-                                            <span className="text-xs text-text-secondary mb-0.5">Precio</span>
-                                            <span className="text-lg font-bold text-primary">
+                                            {viewMode === 'list' && (<span className={`text-xs mb-0.5 ${viewMode === 'list' ? 'text-text-secondary' : 'text-gray-600 dark:text-gray-400'}`}>Precio</span>)}
+                                            <span className={`text-lg font-bold text-primary`}>
+                                                <span className="text-xs font-normal text-white drop-shadow-md mr-1">
+                                                    {product.variants?.length > 1 ? "desde" : "por"}
+                                                </span>
                                                 {formatPrice(product.precio)}
                                             </span>
                                         </div>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-primary hover:text-primary -mr-2">
-                                            <ShoppingCart size={18} />
-                                        </Button>
+                                        {viewMode === "list" && (
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-primary hover:text-primary -mr-2">
+                                                <ShoppingCart size={18} />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             </Link>

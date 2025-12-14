@@ -6,10 +6,11 @@ import { Databases, Query } from "appwrite";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { CommunityAlertBar } from "@/components/layout/CommunityAlertBar";
 import { Button } from "@/components/ui/Button";
-import { Loader2, AlertCircle, ArrowLeft, MessageCircle, Share2, ShoppingCart, Plus, Minus, User as UserIcon, Package, Heart, Home, Star, Gift } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, MessageCircle, Share2, ShoppingCart, Plus, Minus, User as UserIcon, Package, Heart, Home, Star, Gift, Eye, EyeOff, X, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { ShareModal } from "@/components/ui/ShareModal";
 import { ReviewsSection } from "@/components/product/ReviewsSection";
 import { useCart } from "@/context/CartContext";
@@ -39,6 +40,8 @@ export default function AdDetailPage({ params }) {
     // Variant state
     const [variants, setVariants] = useState([]);
     const [selectedVariant, setSelectedVariant] = useState(null);
+    const [showOriginals, setShowOriginals] = useState(false);
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
     const { isFavorite, toggleFavorite } = useFavorites();
 
@@ -73,21 +76,58 @@ export default function AdDetailPage({ params }) {
     const isActive = ad?.activo && !isExpired;
 
     useEffect(() => {
-        async function fetchData() {
+        const cacheKey = `ad_detail_cache_${adId}`;
+
+        // Function to load data from cache
+        const loadFromCache = () => {
             try {
-                setLoading(true);
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    if (data.ad) {
+                        setAd(data.ad);
+                        if (data.variants) setVariants(data.variants);
+                        if (data.advertiserInfo) setAdvertiserInfo(data.advertiserInfo);
+                        if (data.relatedAds) setRelatedAds(data.relatedAds);
+
+                        // Set basic things that might rely on ad data logic
+                        if (variant_slug && data.variants) {
+                            const match = data.variants.find(v => v.slug === variant_slug);
+                            if (match) {
+                                setSelectedVariant(match);
+                                setQuantity(parseInt(match.minQuantity) || 1);
+                            }
+                        }
+
+                        setLoading(false);
+                        return true; // Cache hit
+                    }
+                }
+            } catch (e) {
+                console.error("Error loading from cache:", e);
+            }
+            return false; // Cache miss
+        };
+
+        // Function to fetch fresh data
+        const fetchNetworkData = async () => {
+            try {
+                // If we didn't load from cache, ensure loading is true (unless we already did)
+                // But typically we want to show loading only if no cache.
+                // If we have cache, we just update silently.
+                // We'll manage 'loading' state outside or check active data.
+
                 const databases = new Databases(client);
                 const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 
-                // Fetch Ad Details
+                // 1. Fetch Ad Details
                 const adData = await databases.getDocument(dbId, "anuncios", adId);
-                setAd(adData);
 
-                // Initialize variants immediately
+                let parsedVariants = [];
+                // 2. Parse variants
                 if (adData.variants && adData.variants.length > 0) {
-                    // ... (Variant parsing logic, same as before)
                     try {
-                        const parsedVariants = adData.variants.map(v => {
+                        parsedVariants = adData.variants.map(v => {
                             const parsed = JSON.parse(safeAtob(v));
                             const type = parsed.type || parsed.name;
                             const minQuantity = parsed.minQuantity || parsed.units || 1;
@@ -118,8 +158,8 @@ export default function AdDetailPage({ params }) {
                                 slug: generateSlug(type)
                             };
                         });
-                        setVariants(parsedVariants);
 
+                        // Logic for redirect or selection
                         if (variant_slug) {
                             const match = parsedVariants.find(v => v.slug === variant_slug);
                             if (match) {
@@ -127,34 +167,49 @@ export default function AdDetailPage({ params }) {
                                 setQuantity(parseInt(match.minQuantity) || 1);
                             }
                         } else if (parsedVariants.length > 0) {
+                            // If no variant slug but variants exist, redirect to first variant?
+                            // Existing logic did: router.replace(...)
+                            // We should keep this logic but be careful not to loop if state updates
+                            // Ideally we just select it locally if we want to avoid redirect loop or just do it.
                             const firstVariant = parsedVariants[0];
-                            router.replace(`/${residencialSlug}/anuncio/${adId}/${firstVariant.slug}`);
-                            // We can continue rendering, the redirect will happen
+                            // Only redirect if NOT already on it (checked by variant_slug)
+                            // usage of router.replace inside async might be fine.
+                            if (!variant_slug) {
+                                router.replace(`/${residencialSlug}/anuncio/${adId}/${firstVariant.slug}`);
+                            }
                         }
+
                     } catch (e) {
                         console.error("Error parsing variants:", e);
                     }
                 }
 
-                // UNBLOCK RENDER HERE
-                setLoading(false);
+                // Update state with fresh ad data
+                setAd(adData);
+                setVariants(parsedVariants);
+                setLoading(false); // Valid data received
 
-                // ASYNC: Fetch Advertiser Info
+                // 3. ASYNC Fetch extras (Advertiser & Related)
+                let fetchedAdvertiserInfo = null;
+                let fetchedRelated = [];
+
+                // Advertiser
                 if (adData.celular_anunciante) {
-                    fetch(`/api/users/lookup?phone=${encodeURIComponent(adData.celular_anunciante)}`)
-                        .then(res => res.ok ? res.json() : null)
-                        .then(userData => {
-                            if (userData) setAdvertiserInfo(userData);
-                        })
-                        .catch(err => console.error("Error looking up advertiser:", err));
+                    try {
+                        const res = await fetch(`/api/users/lookup?phone=${encodeURIComponent(adData.celular_anunciante)}`);
+                        if (res.ok) {
+                            fetchedAdvertiserInfo = await res.json();
+                            setAdvertiserInfo(fetchedAdvertiserInfo);
+                        }
+                    } catch (err) { console.error("Error looking up advertiser:", err); }
                 }
 
-                // ASYNC: Fetch Related Ads & Cross Promo
-                (async () => {
+                // Related Ads
+                try {
                     let relatedList = [];
                     let crossList = [];
 
-                    // 1. Fetch Related (Same Advertiser)
+                    // Related (Same Advertiser)
                     let queryField = null;
                     let queryValue = null;
 
@@ -165,64 +220,86 @@ export default function AdDetailPage({ params }) {
                     else if (adData.celular_anunciante) { queryField = 'celular_anunciante'; queryValue = adData.celular_anunciante; }
 
                     if (queryField && queryValue) {
-                        try {
-                            const res = await databases.listDocuments(
-                                dbId, "anuncios",
-                                [
-                                    Query.equal(queryField, queryValue),
-                                    Query.equal("activo", true),
-                                    Query.notEqual("$id", adId),
-                                    Query.limit(6)
-                                ]
-                            );
-                            relatedList = res.documents.map(doc => ({ ...doc, isPaid: false }));
-                        } catch (e) { console.error("Error fetching related:", e); }
+                        const res = await databases.listDocuments(
+                            dbId, "anuncios",
+                            [
+                                Query.equal(queryField, queryValue),
+                                Query.equal("activo", true),
+                                Query.notEqual("$id", adId),
+                                Query.limit(6)
+                            ]
+                        );
+                        relatedList = res.documents.map(doc => ({ ...doc, isPaid: false }));
                     }
 
-                    // 2. Fetch Cross Promo Ads (Matching Category)
-                    try {
-                        const categorySlug = adData.categoria_slug || adData.categoria || '';
-                        if (categorySlug) {
-                            const params = new URLSearchParams({
-                                type: 'cross',
-                                limit: '4', // Fetch a few to mix in
-                                category: categorySlug
-                            });
-                            const res = await fetch(`/api/paid-ads/public?${params}`);
-                            if (res.ok) {
-                                const data = await res.json();
-                                crossList = (data.documents || []).map(doc => ({ ...doc, isPaid: true }));
-                            }
+                    // Cross Promo
+                    const categorySlug = adData.categoria_slug || adData.categoria || '';
+                    if (categorySlug) {
+                        const params = new URLSearchParams({
+                            type: 'cross',
+                            limit: '4',
+                            category: categorySlug
+                        });
+                        const res = await fetch(`/api/paid-ads/public?${params}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            crossList = (data.documents || []).map(doc => ({ ...doc, isPaid: true }));
                         }
-                    } catch (e) {
-                        console.error("Error fetching cross promo ads:", e);
                     }
 
-                    // 3. Mix lists
-                    // Simple mix: Alternate or append?
-                    // "mezclamos los otros anuncios... con la publicidad de tipo cross"
-                    // Let's create a combined list, shuffled or interleaved.
-                    const combined = [...relatedList, ...crossList].sort(() => Math.random() - 0.5);
-                    setRelatedAds(combined);
-                })();
+                    fetchedRelated = [...relatedList, ...crossList].sort(() => Math.random() - 0.5);
+                    setRelatedAds(fetchedRelated);
 
+                } catch (e) {
+                    console.error("Error fetching related:", e);
+                }
 
                 // Log View
                 import("@/lib/analytics").then(({ logAdView }) => {
                     logAdView(adData.$id, false, null, "view");
                 });
 
-                // Removed standalone CrossPromoAd fetch as it's now integrated
+                // Save everything to cache
+                const cacheData = {
+                    ad: adData,
+                    variants: parsedVariants,
+                    advertiserInfo: fetchedAdvertiserInfo, // might be null
+                    relatedAds: fetchedRelated,
+                    timestamp: new Date().getTime()
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+
             } catch (err) {
                 console.error("Error fetching ad data:", err);
-                setError("No pudimos cargar la información del anuncio.");
+                if (!ad) { // Only show error if we don't have cached data
+                    setError("No pudimos cargar la información del anuncio.");
+                }
                 setLoading(false);
             }
+        };
+
+        // Execution Flow
+        if (adId) {
+            const hasCache = loadFromCache();
+            if (!hasCache) {
+                setLoading(true);
+            }
+            // Always fetch fresh data (background revalidation)
+            fetchNetworkData();
         }
 
-        if (adId) {
-            fetchData();
-        }
+        // Online Revalidation
+        const handleOnline = () => {
+            console.log("Online connection restored. Revalidating ad details...");
+            fetchNetworkData();
+        };
+
+        window.addEventListener('online', handleOnline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+        };
+
     }, [adId, variant_slug]);
 
     const { residential: residentialData } = useResidential(residencialSlug);
@@ -342,7 +419,7 @@ export default function AdDetailPage({ params }) {
         );
     }
 
-    const images = ad.imagenes || [];
+    const images = (showOriginals && ad.imagenes_originales?.length > 0) ? ad.imagenes_originales : (ad.imagenes || []);
     const currentImage = images[selectedImage];
 
     // Dynamic Title
@@ -379,7 +456,10 @@ export default function AdDetailPage({ params }) {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                     {/* Image Gallery */}
                     <div className="space-y-4">
-                        <div className="aspect-square bg-surface rounded-2xl overflow-hidden border border-border relative group">
+                        <div
+                            className="aspect-square bg-surface rounded-2xl overflow-hidden border border-border relative group cursor-zoom-in"
+                            onClick={() => setIsImageModalOpen(true)}
+                        >
                             {currentImage ? (
                                 <Image
                                     src={currentImage}
@@ -410,6 +490,52 @@ export default function AdDetailPage({ params }) {
                                     <Heart size={20} className={isFavorite(ad.$id) ? "fill-current" : ""} />
                                 </button>
                             </div>
+
+                            {/* AI Toggle Overlay */}
+                            {ad.imagen_ia && (
+                                <div
+                                    role="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowOriginals(!showOriginals);
+                                    }}
+                                    className="absolute bottom-4 left-4 right-4 p-3 bg-black/40 backdrop-blur-md flex items-center justify-between z-20 rounded-xl border border-white/10 cursor-pointer hover:bg-black/50 transition-all group/toggle"
+                                >
+                                    <div className="flex items-center gap-2 text-white">
+                                        <Star size={14} className="fill-yellow-400 text-yellow-400" />
+                                        <span className="text-xs font-medium shadow-black/50 drop-shadow-sm">
+                                            {(ad.imagenes?.length > 1)
+                                                ? "Mejoradas con IA"
+                                                : "Mejorada con IA"
+                                            }
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-medium text-white/90 transition-colors group-hover/toggle:text-white hidden sm:block">
+                                            {showOriginals ? "Volver a IA" : "Ver originales"}
+                                        </span>
+                                        {/* Mobile text simplified or just keep the switch? User asked for text "desktop alignment". I will keep it visible but maybe shorter on mobile if space is tight. Container is absolute left-4 right-4. It should fit. */}
+                                        <span className="text-[10px] font-medium text-white/90 sm:hidden">
+                                            {showOriginals ? "Volver" : "Originales"}
+                                        </span>
+
+                                        <div
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showOriginals ? 'bg-white/20' : 'bg-primary'}`}
+                                        >
+                                            <span
+                                                className={`${showOriginals ? 'translate-x-4' : 'translate-x-1'} flex items-center justify-center h-3 w-3 transform rounded-full bg-white transition-transform`}
+                                            >
+                                                {showOriginals
+                                                    ? <Eye size={8} className="text-gray-900" />
+                                                    : <EyeOff size={8} className="text-primary" />
+                                                }
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Thumbnail Gallery */}
@@ -462,33 +588,39 @@ export default function AdDetailPage({ params }) {
                         </div>
 
                         {/* Variants Selector */}
-                        {variants.length > 0 && (
+                        {variants.length > 1 && (
                             <div className="space-y-3">
                                 <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
                                     Selecciona una opción
                                 </h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {/* Standard Option: Hidden if variants exist per request */}
+                                <div className="flex overflow-x-auto pb-4 -mx-4 px-4 gap-3 snap-x snap-mandatory sm:flex-wrap sm:mx-0 sm:px-0 sm:pb-0 scrollbar-hide">
                                     {/* variants.map... */}
                                     {variants.map((variant, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => router.push(`/${residencialSlug}/anuncio/${adId}/${variant.slug}`)}
-                                            className={`px-4 py-2 rounded-lg border transition-all text-left relative ${selectedVariant && selectedVariant.slug === variant.slug
-                                                ? 'bg-primary text-white border-primary'
+                                            className={`px-4 py-3 rounded-xl border transition-all text-left relative min-w-[80%] sm:min-w-0 sm:w-auto shrink-0 snap-center flex flex-col gap-1 ${selectedVariant && selectedVariant.slug === variant.slug
+                                                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
                                                 : 'bg-surface text-text-main border-border hover:border-primary'
                                                 }`}
                                         >
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium">{variant.type}</span>
-                                                {variant.offer && (
-                                                    <Gift size={14} className={selectedVariant && selectedVariant.slug === variant.slug ? 'text-white' : 'text-primary'} />
-                                                )}
+                                            <div className="flex items-center justify-between w-full gap-4">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="font-medium truncate">{variant.type}</span>
+                                                    {variant.offer && (
+                                                        <Gift size={14} className={selectedVariant && selectedVariant.slug === variant.slug ? 'text-white' : 'text-primary'} />
+                                                    )}
+                                                </div>
+                                                <div className={`font-bold whitespace-nowrap ${selectedVariant && selectedVariant.slug === variant.slug ? 'text-white' : 'text-primary'}`}>
+                                                    {formatPrice(variant.price)}
+                                                </div>
                                             </div>
-                                            <div className={`text-xs ${selectedVariant && selectedVariant.slug === variant.slug ? 'text-white/80' : 'text-text-secondary'}`}>
-                                                {formatPrice(variant.price)}
-                                                {parseInt(variant.minQuantity) > 1 && ` x ${variant.minQuantity}`}
-                                            </div>
+
+                                            {parseInt(variant.minQuantity) > 1 && (
+                                                <div className={`text-xs ${selectedVariant && selectedVariant.slug === variant.slug ? 'text-white/80' : 'text-text-secondary'}`}>
+                                                    Pack de {variant.minQuantity} unidades
+                                                </div>
+                                            )}
                                         </button>
                                     ))}
                                 </div>
@@ -697,6 +829,70 @@ export default function AdDetailPage({ params }) {
                 cancelText="Cancelar"
                 variant="primary"
             />
+
+            {/* Fullscreen Image Modal */}
+            {isImageModalOpen && (
+                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setIsImageModalOpen(false)}>
+                    <button
+                        onClick={() => setIsImageModalOpen(false)}
+                        className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-[110]"
+                    >
+                        <X size={32} />
+                    </button>
+
+                    <div className="relative w-full h-full flex items-center justify-center animate-in zoom-in-95 duration-300 ease-out" onClick={(e) => e.stopPropagation()}>
+                        {currentImage && (
+                            <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                                <TransformWrapper
+                                    initialScale={1}
+                                    minScale={0.5}
+                                    maxScale={4}
+                                    centerOnInit={true}
+                                >
+                                    <TransformComponent
+                                        wrapperClass="!w-full !h-full flex items-center justify-center"
+                                        contentClass="!w-full !h-full flex items-center justify-center"
+                                    >
+                                        <img
+                                            src={currentImage}
+                                            alt="Vista previa"
+                                            className="max-w-full max-h-full object-contain shadow-2xl rounded-sm"
+                                            style={{ maxHeight: 'calc(100vh - 40px)', maxWidth: '100vw' }}
+                                        />
+                                    </TransformComponent>
+                                </TransformWrapper>
+                            </div>
+                        )}
+
+                        {images.length > 1 && (
+                            <>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedImage((prev) => (prev - 1 + images.length) % images.length);
+                                    }}
+                                    className="absolute left-2 p-3 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all"
+                                >
+                                    <ChevronLeft size={32} />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedImage((prev) => (prev + 1) % images.length);
+                                    }}
+                                    className="absolute right-2 p-3 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all"
+                                >
+                                    <ChevronRight size={32} />
+                                </button>
+
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 px-3 py-1 rounded-full text-white text-sm backdrop-blur-sm">
+                                    {selectedImage + 1} / {images.length}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

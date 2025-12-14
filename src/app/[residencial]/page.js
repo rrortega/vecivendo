@@ -11,6 +11,8 @@ import { client } from "@/lib/appwrite";
 import { Databases, Query } from "appwrite";
 import { useResidential } from "@/hooks/useResidential";
 
+import { MarketplaceSkeleton } from "@/components/skeletons/MarketplaceSkeleton";
+
 export default function ResidentialHome({ params }) {
     const { residencial } = params;
     // We need the ID, but params only has slug. 
@@ -33,7 +35,8 @@ export default function ResidentialHome({ params }) {
 
     // Quick fix: Pass the slug to CommunityAlertBar and let it resolve the ID.
 
-    const { residential: residentialData } = useResidential(residencial);
+    const { residential: residentialData, loading: residentialLoading } = useResidential(residencial);
+
     const [sortOption, setSortOption] = React.useState("recent");
     const [isScrolled, setIsScrolled] = React.useState(false);
     const [showBottomNav, setShowBottomNav] = React.useState(true);
@@ -60,6 +63,11 @@ export default function ResidentialHome({ params }) {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
+    // Show skeleton if loading and no cached data available
+    if (residentialLoading && !residentialData) {
+        return <MarketplaceSkeleton />;
+    }
+
     const residentialName = residentialData?.nombre || residencial;
     const currency = residentialData?.moneda || "MXN";
 
@@ -84,7 +92,7 @@ export default function ResidentialHome({ params }) {
 
                     {/* Mobile Category Chips - Sticky on scroll */}
                     <div className="md:hidden">
-                        <div className={`${isScrolled ? 'fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm pt-4 shadow-md animate-in slide-in-from-top duration-300' : ''}`}>
+                        <div className={`${isScrolled ? 'fixed top-[var(--alert-bar-height,0px)] left-0 right-0 z-50 bg-background/95 backdrop-blur-sm pt-4 shadow-md animate-in slide-in-from-top duration-300' : ''}`}>
                             <CategoryChips residentialId={residentialData?.$id} />
                         </div>
                         {/* Placeholder to prevent layout jump when fixed */}
