@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { databases, dbId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
+export const dynamic = 'force-dynamic';
 
 const PAID_ADS_COLLECTION_ID = 'anuncios_pago';
 const PAID_ADS_STATS_COLLECTION_ID = 'anuncios_pago_stats';

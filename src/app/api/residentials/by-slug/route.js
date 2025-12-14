@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { databases, dbId } from '@/lib/appwrite-server';
+import { client } from "@/lib/appwrite";
 import { Query } from 'node-appwrite';
+
+export const dynamic = 'force-dynamic';
 
 const COLLECTION_ID = 'residenciales';
 

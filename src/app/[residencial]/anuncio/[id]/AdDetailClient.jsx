@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { client } from "@/lib/appwrite";
 import { Databases, Query } from "appwrite";
 import { HomeHeader } from "@/components/home/HomeHeader";
@@ -42,6 +42,21 @@ export default function AdDetailPage({ params }) {
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [showOriginals, setShowOriginals] = useState(false);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const variantRefs = useRef([]);
+
+    // Scroll to selected variant on mobile
+    useEffect(() => {
+        if (selectedVariant && variants.length > 0) {
+            const index = variants.findIndex(v => v.slug === selectedVariant.slug);
+            if (index !== -1 && variantRefs.current[index]) {
+                variantRefs.current[index].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+        }
+    }, [selectedVariant, variants]);
 
     const { isFavorite, toggleFavorite } = useFavorites();
 
@@ -500,7 +515,7 @@ export default function AdDetailPage({ params }) {
                                         e.stopPropagation();
                                         setShowOriginals(!showOriginals);
                                     }}
-                                    className="absolute bottom-4 left-4 right-4 p-3 bg-black/40 backdrop-blur-md flex items-center justify-between z-20 rounded-xl border border-white/10 cursor-pointer hover:bg-black/50 transition-all group/toggle"
+                                    className="absolute bottom-4 left-4 right-4 p-3 bg-black/20 backdrop-blur-md flex items-center justify-between z-20 rounded-xl border border-white/10 cursor-pointer hover:bg-black/50 transition-all group/toggle"
                                 >
                                     <div className="flex items-center gap-2 text-white">
                                         <Star size={14} className="fill-yellow-400 text-yellow-400" />
@@ -598,6 +613,7 @@ export default function AdDetailPage({ params }) {
                                     {variants.map((variant, idx) => (
                                         <button
                                             key={idx}
+                                            ref={el => variantRefs.current[idx] = el}
                                             onClick={() => router.push(`/${residencialSlug}/anuncio/${adId}/${variant.slug}`)}
                                             className={`px-4 py-3 rounded-xl border transition-all text-left relative min-w-[80%] sm:min-w-0 sm:w-auto shrink-0 snap-center flex flex-col gap-1 ${selectedVariant && selectedVariant.slug === variant.slug
                                                 ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
