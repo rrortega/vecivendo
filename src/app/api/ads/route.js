@@ -27,9 +27,22 @@ export async function GET(request) {
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         queries.push(Query.greaterThanEqual("$updatedAt", sevenDaysAgo));
 
+        const sort = searchParams.get('sort') || '$createdAt';
+        const order = searchParams.get('order') || 'desc';
+
+        const params = [
+            sort, order
+        ];
+        console.log("Sorting by:", params);
+
         queries.push(Query.limit(limit));
-        // Orders are usually handled by index or default, add specific if needed
-        queries.push(Query.orderDesc("$createdAt"));
+
+        // Dynamic Sorting
+        if (order === 'asc') {
+            queries.push(Query.orderAsc(sort));
+        } else {
+            queries.push(Query.orderDesc(sort));
+        }
 
         const response = await databases.listDocuments(
             dbId,

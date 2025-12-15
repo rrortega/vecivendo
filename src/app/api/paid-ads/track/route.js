@@ -6,15 +6,37 @@ const PAID_ADS_COLLECTION_ID = 'anuncios_pago';
 const PAID_ADS_STATS_COLLECTION_ID = 'anuncios_pago_stats';
 const LOGS_COLLECTION_ID = 'logs';
 
+const COSTS_COLLECTION_VIEW = 'costo_por_vista';
+const COSTS_COLLECTION_CLICK = 'costo_por_click';
+
+/**
+ * Helper to get current cost
+ */
+async function getCost(type) {
+    try {
+        const collectionId = type === 'view' ? COSTS_COLLECTION_VIEW : COSTS_COLLECTION_CLICK;
+        // Try to fetch specific cost doc or list first one
+        const response = await databases.listDocuments(dbId, collectionId, [Query.limit(1)]);
+        if (response.documents.length > 0) {
+            return response.documents[0].costo || (type === 'view' ? 1 : 5);
+        }
+        return type === 'view' ? 1 : 5;
+    } catch (error) {
+        console.warn('Error fetching cost:', error);
+        return type === 'view' ? 1 : 5;
+    }
+}
+
 /**
  * POST /api/paid-ads/track
  * Tracks views and clicks for paid ads.
  * Updates both the main ad document, daily stats, and central logs.
- * Body: { adId: string, type: 'view' | 'click', sessionId: string }
+ * Deactivates ad if credits run out.
+ * Body: { adId: string, type: 'view' | 'click', sessionId: string, residentialId: string, source: string }
  */
 export async function POST(request) {
     try {
-        const { adId, type, sessionId } = await request.json();
+        const { adId, type, sessionId, residentialId, source } = await request.json();
 
         if (!adId || !type) {
             return NextResponse.json(
@@ -32,26 +54,10 @@ export async function POST(request) {
 
         // Parse User Agent
         const userAgent = request.headers.get('user-agent') || '';
-        const referer = request.headers.get('referer') || 'direct';
+        const referer = source || request.headers.get('referer') || 'direct';
 
-        // Log to central logs table (Async, don't await blocking)
-        const logPromise = databases.createDocument(
-            dbId,
-            LOGS_COLLECTION_ID,
-            ID.unique(),
-            {
-                anuncioPagoId: adId,
-                type: type,
-                sessionId: sessionId || 'unknown', // Fallback if not provided
-                deviceType: getDeviceType(userAgent),
-                os: getOS(userAgent),
-                browser: getBrowser(userAgent),
-                source: referer,
-                timestamp: new Date().toISOString()
-            }
-        ).catch(err => {
-            console.warn('⚠️ [API] Failed to write to logs collection:', err.message);
-        });
+        // Get Cost
+        const cost = await getCost(type);
 
         // Get current ad
         const ad = await databases.getDocument(
@@ -60,12 +66,49 @@ export async function POST(request) {
             adId
         );
 
-        // Increment the appropriate counter on main ad
-        const updateData = {};
+        if (!ad) {
+            return NextResponse.json({ error: 'Ad not found' }, { status: 404 });
+        }
+
+        // Deduct credits
+        const currentCredits = ad.creditos || 0;
+        const newCredits = Math.max(0, currentCredits - cost);
+        const shouldDeactivate = newCredits <= 0;
+
+        // Log to central logs table
+        const logPromise = databases.createDocument(
+            dbId,
+            LOGS_COLLECTION_ID,
+            ID.unique(),
+            {
+                anuncioPagoId: adId,
+                type: type,
+                sessionId: sessionId || 'unknown',
+                deviceType: getDeviceType(userAgent),
+                os: getOS(userAgent),
+                browser: getBrowser(userAgent),
+                source: referer,
+                timestamp: new Date().toISOString(),
+                residencialId: residentialId || null,
+                cost: cost
+            }
+        ).catch(err => {
+            console.warn('⚠️ [API] Failed to write to logs collection:', err.message);
+        });
+
+        // Increment the appropriate counter on main ad and update credits
+        const updateData = {
+            creditos: newCredits
+        };
+
         if (type === 'view') {
             updateData.vistas = (ad.vistas || 0) + 1;
         } else if (type === 'click') {
             updateData.clicks = (ad.clicks || 0) + 1;
+        }
+
+        if (shouldDeactivate) {
+            updateData.active = false;
         }
 
         // Update the main ad document
@@ -79,13 +122,14 @@ export async function POST(request) {
         // Update or create daily stats
         const statsPromise = updateDailyStats(adId, type);
 
-        // Wait for logs and stats (optional, but good for consistency)
         await Promise.allSettled([logPromise, statsPromise]);
 
         return NextResponse.json({
             success: true,
             type,
-            newValue: updateData[type === 'view' ? 'vistas' : 'clicks']
+            newValue: updateData[type === 'view' ? 'vistas' : 'clicks'],
+            creditsRemaining: newCredits,
+            deactivated: shouldDeactivate
         });
     } catch (error) {
         console.error('❌ [API] Error tracking paid ad:', error);

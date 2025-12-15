@@ -5,7 +5,7 @@ import { databases } from "@/lib/appwrite";
 import AdminTable from "@/components/console/AdminTable";
 import { useToast } from "@/context/ToastContext";
 import { useRouter } from "next/navigation";
-import { Building2, Plus, Search } from "lucide-react";
+import { Building2, Plus, Search, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { Query } from "node-appwrite";
 import AddButton from "@/components/console/AddButton";
 import Link from "next/link";
@@ -23,6 +23,10 @@ export default function ResidentialsPage() {
     const collectionId = "residenciales";
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [sortConfig, setSortConfig] = useState({
+        key: '$createdAt',
+        direction: 'desc'
+    });
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -30,15 +34,22 @@ export default function ResidentialsPage() {
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm]);
+    }, [searchTerm, sortConfig]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const queries = [Query.orderDesc('$createdAt')];
+            const queries = [];
 
             if (searchTerm) {
                 queries.push(Query.search('nombre', searchTerm));
+            }
+
+            // Sorting
+            if (sortConfig.direction === 'asc') {
+                queries.push(Query.orderAsc(sortConfig.key));
+            } else {
+                queries.push(Query.orderDesc(sortConfig.key));
             }
 
             const response = await databases.listDocuments(dbId, collectionId, queries);
@@ -59,10 +70,28 @@ export default function ResidentialsPage() {
         }
     };
 
+    const handleSort = (key) => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc'
+        }));
+    };
+
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="text-gray-400" />;
+        return sortConfig.direction === 'asc'
+            ? <ChevronUp size={14} className="text-primary-600" />
+            : <ChevronDown size={14} className="text-primary-600" />;
+    };
+
     const columns = [
         {
             key: "name",
-            label: "Nombre",
+            label: (
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors p-1 rounded" onClick={() => handleSort('nombre')}>
+                    Nombre <SortIcon columnKey="nombre" />
+                </div>
+            ),
             render: (value, row) => (
                 <Link
                     href={`/console/residentials/${row.$id}`}
@@ -79,10 +108,41 @@ export default function ResidentialsPage() {
             )
         },
         { key: "country", label: "País" },
+        {
+            key: "provincia_estado",
+            label: (
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors p-1 rounded" onClick={() => handleSort('provincia_estado')}>
+                    Estado / Provincia <SortIcon columnKey="provincia_estado" />
+                </div>
+            ),
+            render: (value) => <span>{value || '-'}</span>
+        },
         { key: "currency", label: "Moneda" },
         {
+            key: "total_anuncios_gratis",
+            label: (
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors p-1 rounded" onClick={() => handleSort('total_anuncios_gratis')}>
+                    Anuncios Gratis <SortIcon columnKey="total_anuncios_gratis" />
+                </div>
+            ),
+            render: (value) => <span>{value || 0}</span>
+        },
+        {
+            key: "total_anuncios_pago",
+            label: (
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors p-1 rounded" onClick={() => handleSort('total_anuncios_pago')}>
+                    Anuncios Pago <SortIcon columnKey="total_anuncios_pago" />
+                </div>
+            ),
+            render: (value) => <span>{value || 0}</span>
+        },
+        {
             key: "active",
-            label: "Estado",
+            label: (
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors p-1 rounded" onClick={() => handleSort('active')}>
+                    Estado <SortIcon columnKey="active" />
+                </div>
+            ),
             render: (value) => (
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${value ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"}`}>
                     {value ? "Activo" : "Inactivo"}

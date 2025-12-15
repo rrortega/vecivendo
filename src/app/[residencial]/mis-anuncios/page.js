@@ -58,7 +58,8 @@ export default function MisAnunciosPage({ params }) {
             const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 
             await databases.updateDocument(dbId, "anuncios", anuncioId, {
-                activo: !currentStatus
+                activo: !currentStatus,
+                last_capture: new Date().toISOString()
             });
 
             // Update local state
@@ -138,8 +139,8 @@ export default function MisAnunciosPage({ params }) {
                                                 <button
                                                     onClick={() => handleToggleActive(anuncio.$id, anuncio.activo)}
                                                     className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${anuncio.activo
-                                                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200"
-                                                            : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 hover:bg-gray-200"
+                                                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200"
+                                                        : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 hover:bg-gray-200"
                                                         }`}
                                                 >
                                                     {anuncio.activo ? "Activo" : "Inactivo"}

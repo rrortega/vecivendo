@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import * as LucideIcons from 'lucide-react';
 import { X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { databases } from '@/lib/appwrite';
@@ -27,13 +28,12 @@ export default function CategoryFilterModal({ isOpen, onClose, selectedCategorie
                 const mappedCategories = response.documents.map(cat => ({
                     id: cat.$id,
                     label: cat.nombre,
-                    icon: cat.icono || cat.icon || '📦'
+                    iconName: cat.icono || cat.icon // Keep the name
                 }));
 
                 setCategories(mappedCategories);
             } catch (error) {
                 console.error('Error fetching categories:', error);
-                // Fallback to basic if fetch fails, though empty list is safer
             } finally {
                 setLoading(false);
             }
@@ -49,17 +49,31 @@ export default function CategoryFilterModal({ isOpen, onClose, selectedCategorie
 
     const toggleCategory = (id) => {
         if (selectedCategories.includes(id)) {
-            // Remove category
             const newSelection = selectedCategories.filter(c => c !== id);
             onApply(newSelection);
         } else {
-            // Add category
             onApply([...selectedCategories, id]);
         }
     };
 
     const handleClear = () => {
         onApply([]);
+    };
+
+    const getIcon = (iconName) => {
+        if (!iconName) return LucideIcons.Package;
+        // Check if it's an emoji (simple check: if it's not a valid Lucide key)
+        if (!LucideIcons[iconName]) {
+            // If it seems to be an emoji/string that is NOT in Lucide, return null so we can render as text?
+            // Or just default to Package.
+            // But if it IS an emoji, we want to render it as text.
+            // Simple heuristic: if it starts with uppercase and matches /^[A-Z][a-zA-Z]+$/, assume Lucide.
+            // Or just check existence.
+            // If it's an emoji strings length is usually small chars but logic is tricky.
+            // Let's assume if it is NOT in LucideIcons, it might be an emoji.
+            return null;
+        }
+        return LucideIcons[iconName];
     };
 
     return (
@@ -111,6 +125,8 @@ export default function CategoryFilterModal({ isOpen, onClose, selectedCategorie
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                         {categories.map((cat) => {
                                             const isSelected = selectedCategories.includes(cat.id);
+                                            const IconComponent = getIcon(cat.iconName);
+
                                             return (
                                                 <button
                                                     key={cat.id}
@@ -122,7 +138,9 @@ export default function CategoryFilterModal({ isOpen, onClose, selectedCategorie
                                                             : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50'}
                                                     `}
                                                 >
-                                                    <span className="text-2xl filter drop-shadow-sm">{cat.icon}</span>
+                                                    <span className="text-2xl filter drop-shadow-sm flex items-center justify-center w-8 h-8">
+                                                        {IconComponent ? <IconComponent size={24} /> : (cat.iconName || '📦')}
+                                                    </span>
                                                     <span className={`font-medium text-sm sm:text-base ${isSelected ? 'text-primary' : 'text-gray-700 dark:text-gray-300'}`}>
                                                         {cat.label}
                                                     </span>

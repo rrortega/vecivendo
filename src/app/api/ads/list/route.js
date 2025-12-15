@@ -52,7 +52,7 @@ export async function GET(request) {
                 break;
             case 'recent':
             default:
-                queries.push(Query.orderDesc('$updatedAt'));
+                queries.push(Query.orderDesc('last_capture'));
                 break;
         }
 

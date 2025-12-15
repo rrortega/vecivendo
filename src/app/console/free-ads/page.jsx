@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/context/ToastContext";
-import { Search, Filter, Calendar, Building2, Tag, ImageOff, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { Search, Filter, Calendar, Building2, Tag, ImageOff, ChevronLeft, ChevronRight, Trash2, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AddButton from "@/components/console/AddButton";
 import ConfirmModal from "@/components/console/ConfirmModal";
@@ -31,6 +31,11 @@ export default function AdsPage() {
         date: "", // YYYY-MM-DD
     });
 
+    const [sortConfig, setSortConfig] = useState({
+        key: '$createdAt',
+        direction: 'desc'
+    });
+
     const { showToast } = useToast();
 
     useEffect(() => {
@@ -41,7 +46,7 @@ export default function AdsPage() {
     useEffect(() => {
         fetchAds();
         setSelectedIds([]); // Limpiar selección al cambiar de página o filtros
-    }, [page, filters, limit]);
+    }, [page, filters, limit, sortConfig]);
 
     const fetchResidentials = async () => {
         try {
@@ -73,7 +78,9 @@ export default function AdsPage() {
             // Construir parámetros de query
             const params = new URLSearchParams({
                 page: page.toString(),
-                limit: limit.toString()
+                limit: limit.toString(),
+                sort: sortConfig.key,
+                order: sortConfig.direction
             });
 
             if (filters.search) {
@@ -205,6 +212,22 @@ export default function AdsPage() {
         }
     };
 
+
+
+    const handleSort = (key) => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc'
+        }));
+    };
+
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="text-gray-400" />;
+        return sortConfig.direction === 'asc'
+            ? <ChevronUp size={14} className="text-primary-600" />
+            : <ChevronDown size={14} className="text-primary-600" />;
+    };
+
     const totalPages = Math.ceil(total / limit);
 
     return (
@@ -290,12 +313,27 @@ export default function AdsPage() {
                                     />
                                 </th>
                                 <th className="px-4 py-3 w-16">Imagen</th>
-                                <th className="px-4 py-3">Título</th>
-                                <th className="px-4 py-3">Precio</th>
+                                <th className="px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('titulo')}>
+                                    <div className="flex items-center gap-2">Título <SortIcon columnKey="titulo" /></div>
+                                </th>
+                                <th className="px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('precio')}>
+                                    <div className="flex items-center gap-2">Precio <SortIcon columnKey="precio" /></div>
+                                </th>
                                 <th className="px-4 py-3">Categoría</th>
                                 <th className="px-4 py-3">Residencial</th>
                                 <th className="px-4 py-3 text-center">Variantes</th>
-                                <th className="px-4 py-3">Fecha</th>
+                                <th className="px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('$createdAt')}>
+                                    <div className="flex items-center gap-2">Fecha <SortIcon columnKey="$createdAt" /></div>
+                                </th>
+                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('vistas')}>
+                                    <div className="flex items-center justify-center gap-2">Vistas <SortIcon columnKey="vistas" /></div>
+                                </th>
+                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('total_pedidos')}>
+                                    <div className="flex items-center justify-center gap-2">Pedidos <SortIcon columnKey="total_pedidos" /></div>
+                                </th>
+                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('valoracion_promedio')}>
+                                    <div className="flex items-center justify-center gap-2">Reviews <SortIcon columnKey="valoracion_promedio" /></div>
+                                </th>
                                 <th className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -378,6 +416,21 @@ export default function AdsPage() {
                                         </td>
                                         <td className="px-4 py-2 admin-text-muted whitespace-nowrap text-xs cursor-pointer" onClick={() => router.push(`/console/free-ads/${ad.$id}`)}>
                                             {new Date(ad.$createdAt).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-4 py-2 text-center text-sm admin-text" onClick={() => router.push(`/console/free-ads/${ad.$id}`)}>
+                                            {ad.vistas || 0}
+                                        </td>
+                                        <td className="px-4 py-2 text-center text-sm admin-text" onClick={() => router.push(`/console/free-ads/${ad.$id}`)}>
+                                            {ad.total_pedidos || 0}
+                                        </td>
+                                        <td className="px-4 py-2 text-center text-sm admin-text" onClick={() => router.push(`/console/free-ads/${ad.$id}`)}>
+                                            <div className="flex flex-col items-center">
+                                                <div className="flex items-center gap-1 text-amber-500">
+                                                    <span className="font-medium">{ad.valoracion_promedio ? ad.valoracion_promedio.toFixed(1) : "0.0"}</span>
+                                                    <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                                </div>
+                                                <span className="text-xs text-gray-500">({ad.total_reviews || 0})</span>
+                                            </div>
                                         </td>
                                         <td className="px-4 py-2 text-right cursor-pointer" onClick={() => router.push(`/console/free-ads/${ad.$id}`)}>
                                             <button

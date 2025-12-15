@@ -49,10 +49,25 @@ const getBrowser = () => {
     return "Other";
 };
 
-export const logAdView = async (adId, isPaidAd = false, user = null, type = 'view') => {
+/**
+ * Logs an ad view.
+ * @param {string} adId - Ad ID
+ * @param {boolean} isPaidAd - Is it a paid ad?
+ * @param {object} user - User object (optional)
+ * @param {string} type - 'view' or 'click'
+ * @param {string} residentialId - Residential ID (optional)
+ * @param {string} sourceOverride - Source override (optional, e.g. "sms")
+ */
+export const logAdView = async (adId, isPaidAd = false, user = null, type = 'view', residentialId = null, sourceOverride = null) => {
     try {
         const sessionId = getSessionId();
         if (!sessionId) return; // Should not happen on client
+
+        // Filter localhost
+        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+            console.log("Ad logging ignored (localhost)");
+            return;
+        }
 
         // Don't log views from admin panel
         if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/console') || window.location.pathname.startsWith('/admin'))) {
@@ -60,7 +75,23 @@ export const logAdView = async (adId, isPaidAd = false, user = null, type = 'vie
             return;
         }
 
-        const queryField = isPaidAd ? "anuncioPagoId" : "anuncioId";
+        // If paid ad, use the API to ensure credit deduction
+        if (isPaidAd) {
+            fetch('/api/paid-ads/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    adId,
+                    type,
+                    sessionId,
+                    residentialId,
+                    source: sourceOverride
+                })
+            }).catch(e => console.error("Error tracking paid ad via API:", e));
+            return;
+        }
+
+        const queryField = "anuncioId";
 
         // Rate limiting logic: Only for 'view' events
         if (type === 'view') {
@@ -86,7 +117,7 @@ export const logAdView = async (adId, isPaidAd = false, user = null, type = 'vie
             }
         }
 
-        // Create new log
+        // Create new log (Free Ads)
         const logData = {
             [queryField]: adId,
             sessionId: sessionId,
@@ -95,11 +126,13 @@ export const logAdView = async (adId, isPaidAd = false, user = null, type = 'vie
             deviceType: getDeviceType(),
             os: getOS(),
             browser: getBrowser(),
-            source: document.referrer.includes(window.location.hostname) ? 'internal' : (document.referrer || 'direct'),
+            source: sourceOverride || (document.referrer.includes(window.location.hostname) ? 'internal' : (document.referrer || 'direct')),
             timestamp: new Date().toISOString(),
-            // Geolocation would typically be handled by a backend function or edge function to avoid exposing API keys or trusting client data blindly.
-            // For now, we omit it or could use a public IP API if strictly required client-side.
+            residencialId: residentialId
         };
+
+        // Remove undefined keys
+        Object.keys(logData).forEach(key => logData[key] === undefined && delete logData[key]);
 
         await databases.createDocument(
             DB_ID,

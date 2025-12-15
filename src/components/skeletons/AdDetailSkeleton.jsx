@@ -6,7 +6,6 @@ export function AdDetailSkeleton() {
     return (
         <div className="min-h-screen bg-background pb-24" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
             {/* Header & Alert Bar Skeleton */}
-            <div className="w-full h-10 bg-gray-200 dark:bg-gray-800 animate-pulse" />
             <div className="w-full h-16 border-b border-border bg-background flex items-center px-4">
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse mr-3" />
                 <div className="w-32 h-6 rounded bg-gray-200 dark:bg-gray-800 animate-pulse" />

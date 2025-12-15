@@ -135,7 +135,9 @@ export default function AdEditForm({ ad }) {
                 dias_vigencia: parseInt(formData.dias_vigencia),
                 imagenes: formData.imagenes.filter(url => url && isValidUrl(url)),
                 variants: formData.variants,
-                activo: formData.active
+                variants: formData.variants,
+                activo: formData.active,
+                last_capture: new Date().toISOString()
             };
 
             console.log('📤 Enviando datos del anuncio:', data);

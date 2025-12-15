@@ -73,6 +73,12 @@ export async function generateMetadata({ params }) {
     };
 }
 
+import RedirectTracker from './RedirectTracker';
+
+// ... (existing imports)
+
+// ... (existing generatesMetadata)
+
 export default async function ShortLinkPage({ params }) {
     const { id: adId } = params;
     const ad = await getAd(adId);
@@ -86,29 +92,16 @@ export default async function ShortLinkPage({ params }) {
         );
     }
 
-    // Get residential slug to construct canonical URL
+    // Get residential slug
     const residential = await getResidential(ad.residencial);
-
-    // Fallback if residential not found (should be rare)
-    // If no residential info, we can't redirect properly to the canonical URL structure /[residential]/anuncio/[id]
-    // Maybe redirect to home? Or just log error.
     const residentialSlug = residential ? residential.slug : 'unknown';
+    const residentialId = residential ? residential.$id : null;
     const targetUrl = `/${residentialSlug}/anuncio/${adId}`;
-
-    // Server-side redirect (cleanest for users, but might lose referer info if that matters)
-    // User requested "link se muestre con imagen ... AL acceder de verdad a ella debe hacer un redirect"
-    // Next.js redirect() is server-side status code 307. 
-    // Bots usually don't follow 307 for previews, they just read the OG tags from the first response.
-    // So using a client-side redirect via meta refresh + JS is safer for preserving the "preview" capability 
-    // while ensuring the user gets moved. 
-    // HOWEVER, Next.js 'redirect()' stops rendering and sends the header.
-    // If we want to serve HTML with OG tags *AND* then redirect, we must NOT use next/navigation redirect().
-    // We must render a page with a script interactively.
 
     return (
         <html lang="es">
             <head>
-                <meta httpEquiv="refresh" content={`0;url=${targetUrl}`} />
+                {/* No meta refresh, let JS handle it for logging */}
                 <link rel="preconnect" href="https://aw.chamba.pro" />
                 <script src="https://cdn.tailwindcss.com"></script>
                 <script>
@@ -171,10 +164,10 @@ export default async function ShortLinkPage({ params }) {
                     </main>
                 </div>
 
-                <script
-                    dangerouslySetInnerHTML={{
-                        __html: `window.location.replace("${targetUrl}");`
-                    }}
+                <RedirectTracker
+                    adId={adId}
+                    targetUrl={targetUrl}
+                    residentialId={residentialId}
                 />
             </body>
         </html>

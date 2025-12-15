@@ -226,28 +226,38 @@ export function calculateConversionRate(totalOrders, totalViews) {
  * @returns {Object} - KPIs de usuarios
  */
 export function calculateUserKPIs(anuncios, previousAnuncios) {
-    // Extraer anunciantes únicos
+    // Active Advertisers: Distinct celular_anunciante from ACTIVE ads
     const activeAdvertisers = new Set(
         anuncios
-            .filter(ad => ad.anunciante_id)
-            .map(ad => ad.anunciante_id.$id || ad.anunciante_id)
+            .filter(ad => ad.activo && ad.celular_anunciante)
+            .map(ad => ad.celular_anunciante)
     );
 
     const previousActiveAdvertisers = new Set(
         previousAnuncios
-            .filter(ad => ad.anunciante_id)
-            .map(ad => ad.anunciante_id.$id || ad.anunciante_id)
+            .filter(ad => ad.activo && ad.celular_anunciante)
+            .map(ad => ad.celular_anunciante)
     );
 
-    // Nuevos anunciantes (que están en el período actual pero no en el anterior)
-    const newAdvertisers = [...activeAdvertisers].filter(
-        id => !previousActiveAdvertisers.has(id)
+    // New Advertisers: Distinct celular_anunciante from ads created in the last 6 days
+    const now = new Date();
+    const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+
+    // We only look at current period ads for "new" count in this context
+    const newAdvertisersSet = new Set(
+        anuncios
+            .filter(ad => {
+                if (!ad.celular_anunciante || !ad.$createdAt) return false;
+                const createdAt = new Date(ad.$createdAt);
+                return createdAt >= sixDaysAgo;
+            })
+            .map(ad => ad.celular_anunciante)
     );
 
-    // Anunciantes por residencial
+    // Anunciantes por residencial (Classic logic but using celular_anunciante)
     const advertisersByResidential = anuncios.reduce((acc, ad) => {
-        if (!ad.anunciante_id) return acc;
-        const advertiserId = ad.anunciante_id.$id || ad.anunciante_id;
+        if (!ad.celular_anunciante) return acc;
+        const advertiserId = ad.celular_anunciante;
         const residentialId = ad.residencial_id?.$id || ad.residencial_id || 'Sin residencial';
 
         if (!acc[residentialId]) {
@@ -257,7 +267,7 @@ export function calculateUserKPIs(anuncios, previousAnuncios) {
         return acc;
     }, {});
 
-    // Convertir Sets a números
+    // Convert Sets to numbers
     Object.keys(advertisersByResidential).forEach(key => {
         advertisersByResidential[key] = advertisersByResidential[key].size;
     });
@@ -266,7 +276,7 @@ export function calculateUserKPIs(anuncios, previousAnuncios) {
         activeAdvertisers: activeAdvertisers.size,
         activeAdvertisersPrevious: previousActiveAdvertisers.size,
         activeAdvertisersChange: calculateChange(activeAdvertisers.size, previousActiveAdvertisers.size),
-        newAdvertisers: newAdvertisers.length,
+        newAdvertisers: newAdvertisersSet.size,
         advertisersByResidential
     };
 }
@@ -274,22 +284,33 @@ export function calculateUserKPIs(anuncios, previousAnuncios) {
 /**
  * Calcula KPIs de publicidad pagada
  * @param {Array} paidAds - Array de anuncios pagados
- * @param {Array} paidLogs - Array de logs de anuncios pagados
- * @param {Array} previousPaidAds - Array de anuncios pagados del período anterior
- * @param {Array} previousPaidLogs - Array de logs del período anterior
+ * @param {Array} logs - Array de logs
+ * @param {Array} orders - Array de pedidos (opcional, para conversion)
+ * @param {Array} previousPaidAds - Array de anuncios pagados previos
+ * @param {Array} previousLogs - Array de logs previos
+ * @param {Array} previousOrders - Array de pedidos previos
  * @returns {Object} - KPIs de publicidad pagada
  */
-export function calculatePaidAdKPIs(paidAds, paidLogs, previousPaidAds, previousPaidLogs) {
+export function calculatePaidAdKPIs(paidAds, logs, orders = [], previousPaidAds, previousLogs, previousOrders = []) {
     const activeAds = paidAds.filter(ad => ad.activo);
     const previousActiveAds = previousPaidAds.filter(ad => ad.activo);
 
-    const impressions = paidLogs.filter(log => log.type === 'view');
-    const clicks = paidLogs.filter(log => log.type === 'click');
-    const previousImpressions = previousPaidLogs.filter(log => log.type === 'view');
-    const previousClicks = previousPaidLogs.filter(log => log.type === 'click');
+    const impressions = logs.filter(l => l.type === 'view' && (l.anuncioId || l.anuncioPagoId)); // Simplified check
+    const clicks = logs.filter(l => l.type === 'click' && (l.anuncioId || l.anuncioPagoId));
+
+    const previousImpressions = previousLogs.filter(l => l.type === 'view');
+    const previousClicks = previousLogs.filter(l => l.type === 'click');
 
     const ctr = impressions.length > 0 ? (clicks.length / impressions.length) * 100 : 0;
     const previousCtr = previousImpressions.length > 0 ? (previousClicks.length / previousImpressions.length) * 100 : 0;
+
+    // Conversion Rate: Orders / Impressions (Views)
+    // Since we don't have direct attribution here without expanding, we'll use (Total Orders / Total Impressions) as a rough proxy if orders are passed, 
+    // OR just use Clicks/Impressions again? No that's CTR.
+    // Let's rely on the arguments passed. I need to update the function signature.
+    const conversionRate = impressions.length > 0 ? (orders.length / impressions.length) * 100 : 0;
+    const previousConversionRate = previousImpressions.length > 0 ? (previousOrders.length / previousImpressions.length) * 100 : 0;
+
 
     return {
         activePaidAds: activeAds.length,
@@ -300,7 +321,10 @@ export function calculatePaidAdKPIs(paidAds, paidLogs, previousPaidAds, previous
         impressionsChange: calculateChange(impressions.length, previousImpressions.length),
         ctr,
         ctrPrevious: previousCtr,
-        ctrChange: calculateChange(ctr, previousCtr)
+        ctrChange: calculateChange(ctr, previousCtr),
+        conversionRate,
+        conversionRatePrevious: previousConversionRate,
+        conversionRateChange: calculateChange(conversionRate, previousConversionRate)
     };
 }
 

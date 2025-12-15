@@ -49,6 +49,10 @@ export async function PATCH(request, { params }) {
         delete payload.$databaseId;
         delete payload.$collectionId;
 
+        // Remove attributes not yet in schema to prevent errors
+        delete payload.categorias;
+        delete payload.dailyImpact;
+
         const result = await databases.updateDocument(
             dbId,
             PAID_ADS_COLLECTION_ID,

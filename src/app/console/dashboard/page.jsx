@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     BarChart3,
     Eye,
@@ -24,9 +24,49 @@ import KPISection from '@/components/console/dashboard/KPISection';
 import ChartWidget from '@/components/console/dashboard/ChartWidget';
 import CategoryFilterModal from '@/components/console/dashboard/CategoryFilterModal';
 import { useDashboardKPIs } from '@/hooks/useDashboardKPIs';
-import { useEffect } from 'react';
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE;
+
+function LoadingProgressBar({ loading }) {
+    const [progress, setProgress] = useState(0);
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        if (loading) {
+            setVisible(true);
+            setProgress(0);
+            // Start progress animation
+            const interval = setInterval(() => {
+                setProgress(prev => {
+                    // Slow down as it reaches 90%
+                    if (prev >= 90) return prev;
+                    const increment = Math.max(1, (90 - prev) / 10);
+                    return prev + increment;
+                });
+            }, 200);
+            return () => clearInterval(interval);
+        } else {
+            // Complete progress
+            setProgress(100);
+            const timeout = setTimeout(() => {
+                setVisible(false);
+                setProgress(0);
+            }, 500); // Wait for transition to finish before hiding
+            return () => clearTimeout(timeout);
+        }
+    }, [loading]);
+
+    if (!visible) return null;
+
+    return (
+        <div className="fixed top-0 left-0 w-full h-[3px] z-[100] pointer-events-none">
+            <div
+                className="h-full bg-primary transition-all duration-300 ease-out"
+                style={{ width: `${progress}% ` }}
+            />
+        </div>
+    );
+}
 
 export default function DashboardPage() {
     const [startDate, setStartDate] = useState(null);
@@ -42,29 +82,22 @@ export default function DashboardPage() {
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
     // Filter Logic derived from selections
-    const derivedResidentialIds = (() => {
-        // 1. If specific residential is selected, use only that.
+    const derivedResidentialIds = useMemo(() => {
         if (residentialId) return [residentialId];
 
-        // 2. If filtering by state, get all residentials in that state.
-        if (selectedState !== 'all') {
-            return residentials
-                .filter(r => r.provincia_estado === selectedState)
-                .map(r => r.$id);
-        }
-
-        // 3. If filtering by country, get all residentials in that country.
-        if (selectedCountry !== 'all') {
+        if (selectedCountry && selectedCountry !== 'all') {
+            if (selectedState && selectedState !== 'all') {
+                return residentials
+                    .filter(r => r.country === selectedCountry && r.provincia_estado === selectedState)
+                    .map(r => r.$id);
+            }
             return residentials
                 .filter(r => r.country === selectedCountry)
                 .map(r => r.$id);
         }
 
-        // 4. No location filter -> return null (meaning all) or empty array?
-        // Hook logic: if (residentialIds && residentialIds.length > 0) -> filter.
-        // So passing null or [] means "All".
         return null;
-    })();
+    }, [residentialId, selectedCountry, selectedState, residentials]);
 
     const { kpis, loading, error } = useDashboardKPIs(
         startDate || new Date(),
@@ -77,13 +110,16 @@ export default function DashboardPage() {
     useEffect(() => {
         async function fetchResidentials() {
             try {
-                // Using BaaS instead of direct Appwrite client
-                const baas = (await import('@/lib/baas')).default;
+                // Use local BFF route instead of direct BaaS call
+                // This avoids malformed URL issues and keeps logic server-side
+                const response = await fetch('/api/dashboard/residentials');
 
-                const response = await baas.get(
-                    `databases/${DATABASE_ID}/collections/residenciales/documents`
-                );
-                setResidentials(response.documents);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch residentials');
+                }
+
+                const data = await response.json();
+                setResidentials(data);
             } catch (error) {
                 console.error('Error loading residentials:', error);
             }
@@ -208,6 +244,7 @@ export default function DashboardPage() {
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
+            <LoadingProgressBar loading={loading} />
             {/* Header */}
             <div className="mb-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
@@ -216,11 +253,11 @@ export default function DashboardPage() {
                     </h1>
                     <div className="flex bg-surface rounded-lg p-1  dark:border-gray-700 overflow-x-auto">
                         {[
-                            { id: '7days', label: '7 Días' },
-                            { id: '30days', label: '30 Días' },
-                            { id: 'thisMonth', label: 'Mes Actual' },
-                            { id: 'lastMonth', label: 'Mes Pasado' },
-                            { id: 'thisYear', label: 'Año Actual' }
+                            { id: '7days', label: '7 Días', shortLabel: '7D' },
+                            { id: '30days', label: '30 Días', shortLabel: '30D' },
+                            { id: 'thisMonth', label: 'Mes Actual', shortLabel: '1M' },
+                            { id: 'lastMonth', label: 'Mes Pasado', shortLabel: '-1M' },
+                            { id: 'thisYear', label: 'Año Actual', shortLabel: 'Año' }
                         ].map((period) => (
                             <button
                                 key={period.id}
@@ -230,7 +267,8 @@ export default function DashboardPage() {
                                     : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
                                     }`}
                             >
-                                {period.label}
+                                <span className="md:hidden">{period.shortLabel}</span>
+                                <span className="hidden md:inline">{period.label}</span>
                             </button>
                         ))}
                     </div>
@@ -371,8 +409,8 @@ export default function DashboardPage() {
                         />
                     </KPISection>
 
-                    {/* Gráfico de Anuncios por Categoría */}
-                    {categoryChartData.length > 0 && (
+                    {/* Gráfico de Anuncios por Categoría - Ocultar solo si hay exactamente 1 categoría seleccionada */}
+                    {categoryChartData.length > 0 && selectedCategories.length !== 1 && (
                         <div className="mb-8">
                             <ChartWidget
                                 title="Anuncios por Categoría"
@@ -509,6 +547,14 @@ export default function DashboardPage() {
                             value={kpis.paidAds.ctr}
                             previousValue={kpis.paidAds.ctrPrevious}
                             change={kpis.paidAds.ctrChange}
+                            icon={TrendingUp}
+                            format="percentage"
+                        />
+                        <KPICard
+                            title="Tasa de Conversión"
+                            value={kpis.paidAds.conversionRate || 0}
+                            previousValue={kpis.paidAds.conversionRatePrevious || 0}
+                            change={kpis.paidAds.conversionRateChange}
                             icon={TrendingUp}
                             format="percentage"
                         />

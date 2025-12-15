@@ -90,6 +90,7 @@ export async function GET(request) {
         // Build queries - fetch more initially to filter by budget later
         const queries = [
             Query.equal('active', true),
+            Query.greaterThan('creditos', 0), // Filter out empty budget
             Query.lessThanEqual('fecha_inicio', now),
             Query.greaterThanEqual('fecha_fin', now),
             Query.limit(Math.min(limit * 3, 100)) // Fetch extra to account for budget filtering
