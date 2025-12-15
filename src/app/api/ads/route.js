@@ -23,6 +23,10 @@ export async function GET(request) {
             queries.push(Query.equal("activo", true));
         }
 
+        // Filter ads updated in the last 7 days
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        queries.push(Query.greaterThanEqual("$updatedAt", sevenDaysAgo));
+
         queries.push(Query.limit(limit));
         // Orders are usually handled by index or default, add specific if needed
         queries.push(Query.orderDesc("$createdAt"));

@@ -1,3 +1,5 @@
+import { requestDeduplicator } from './request-deduplicator';
+
 /**
  * BaaS Client - Wrapper for making requests through the BFF proxy
  * 
@@ -56,14 +58,19 @@ export async function baasGet(path, queries = {}) {
         }
     });
 
-    const response = await fetch(url.toString());
+    const requestKey = url.toString();
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(error.message || error.error || `Request failed: ${response.status}`);
-    }
+    // Use deduplicator to share inflight requests
+    return requestDeduplicator.execute(requestKey, async () => {
+        const response = await fetch(requestKey);
 
-    return response.json();
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(error.message || error.error || `Request failed: ${response.status}`);
+        }
+
+        return response.json();
+    });
 }
 
 /**
