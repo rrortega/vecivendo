@@ -62,9 +62,10 @@ export function filterByDateRange(documents, startDate, endDate, dateField = '$c
  * Calcula KPIs de anuncios
  * @param {Array} anuncios - Array de anuncios
  * @param {Array} previousAnuncios - Array de anuncios del período anterior
+ * @param {Object} categoriesMap - Mapa de ID de categoría a Nombre (opcional)
  * @returns {Object} - KPIs de anuncios
  */
-export function calculateAdKPIs(anuncios, previousAnuncios) {
+export function calculateAdKPIs(anuncios, previousAnuncios, categoriesMap = {}) {
     const activeAds = anuncios.filter(ad => ad.activo);
     const previousActiveAds = previousAnuncios.filter(ad => ad.activo);
 
@@ -73,8 +74,30 @@ export function calculateAdKPIs(anuncios, previousAnuncios) {
 
     // Anuncios por categoría
     const adsByCategory = anuncios.reduce((acc, ad) => {
-        const category = ad.categoria || 'Sin categoría';
-        acc[category] = (acc[category] || 0) + 1;
+        // Try to get category ID: could be a string, or an object if expanded
+        let categoryId = null;
+        let categoryName = 'Sin categoría';
+
+        if (ad.categorias && Array.isArray(ad.categorias) && ad.categorias.length > 0) {
+            // If array, take first for counting (simplified) or count all?
+            // Usually one main category. Let's iterate if we want multi-category, 
+            // but 'adsByCategory' usually implies one bucket. 
+            // User said "distinct by category". 
+            // Let's pick the first one's ID/Object.
+            const firstCat = ad.categorias[0];
+            categoryId = typeof firstCat === 'object' ? firstCat.$id : firstCat;
+            categoryName = typeof firstCat === 'object' ? (firstCat.nombre || firstCat.name) : (categoriesMap[firstCat] || categoryId);
+        } else if (ad.categoria) {
+            // Legacy singular field check
+            const cat = ad.categoria;
+            categoryId = typeof cat === 'object' ? cat.$id : cat;
+            categoryName = typeof cat === 'object' ? (cat.nombre || cat.name) : (categoriesMap[categoryId] || categoryId);
+        }
+
+        // Apply distinct name resolution
+        if (!categoryName) categoryName = 'Sin categoría';
+
+        acc[categoryName] = (acc[categoryName] || 0) + 1;
         return acc;
     }, {});
 
@@ -344,4 +367,18 @@ export function formatNumber(value) {
  */
 export function formatPercentage(value, decimals = 1) {
     return `${value.toFixed(decimals)}%`;
+}
+
+/**
+ * Calcula la salud del sistema basado en logs
+ * @param {Array} logs - Array de logs
+ * @returns {Object} - Métrica de salud del sistema
+ */
+export function calculateSystemHealth(logs = []) {
+    // Simple implementation based on error logs presence
+    const errorCount = logs.filter(l => l.type === 'error' || l.level === 'error').length;
+    return {
+        status: errorCount > 0 ? 'degraded' : 'healthy',
+        errorCount
+    };
 }

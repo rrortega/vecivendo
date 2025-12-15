@@ -22,13 +22,13 @@ import { Clock } from "lucide-react";
 import { AdDetailSkeleton } from "@/components/skeletons/AdDetailSkeleton";
 import PaidAdCard from "@/components/ads/PaidAdCard";
 
-export default function AdDetailPage({ params }) {
+export default function AdDetailPage({ params, initialAd }) {
     const { residencial: residencialSlug, id: adId, variant_slug } = params;
     const router = useRouter();
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!initialAd);
     const [error, setError] = useState(null);
-    const [ad, setAd] = useState(null);
+    const [ad, setAd] = useState(initialAd || null);
     const [relatedAds, setRelatedAds] = useState([]); // This now holds mixed types
     const [quantity, setQuantity] = useState(1);
     const [selectedImage, setSelectedImage] = useState(0);
@@ -127,10 +127,12 @@ export default function AdDetailPage({ params }) {
         // Function to fetch fresh data
         const fetchNetworkData = async () => {
             try {
-                // If we didn't load from cache, ensure loading is true (unless we already did)
-                // But typically we want to show loading only if no cache.
-                // If we have cache, we just update silently.
-                // We'll manage 'loading' state outside or check active data.
+                // If we have initialAd and it matches the current ID (which it should), we might skip full fetch
+                // But we still need related ads, advertiser info, etc.
+                // However, let's keep it simple: fetch everything if not loading from internal cache.
+                // If initialAd is present, we already showed the main content.
+                // We can let this run in background to fetch related data.
+
 
                 const databases = new Databases(client);
                 const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";

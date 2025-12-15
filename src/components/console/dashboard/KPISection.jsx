@@ -1,6 +1,6 @@
 'use client';
 
-export default function KPISection({ title, children, icon: Icon }) {
+export default function KPISection({ title, children, icon: Icon, gridClassName = '' }) {
     return (
         <div className="mb-10">
             <div className="flex items-center gap-3 mb-6">
@@ -14,7 +14,7 @@ export default function KPISection({ title, children, icon: Icon }) {
                 </h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className={`grid gap-6 ${gridClassName || 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 {children}
             </div>
         </div>

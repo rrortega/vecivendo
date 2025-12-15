@@ -1,11 +1,12 @@
 import AdDetailClient from "../AdDetailClient";
 import { Client, Databases } from "appwrite";
+import { cache } from 'react';
 
 // Helper to fetch ad data (reused from parent page logic if needed, or just let client handle it)
 // For metadata, we might want to fetch the specific variant info if possible, 
 // but for now we'll reuse the main ad metadata logic or similar.
 
-async function getAd(adId) {
+const getAd = cache(async (adId) => {
     try {
         const client = new Client()
             .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
@@ -19,7 +20,7 @@ async function getAd(adId) {
         console.error("Error fetching ad for metadata:", error);
         return null;
     }
-}
+});
 
 export async function generateMetadata({ params }) {
     const { id: adId, variant_slug } = params;
@@ -78,6 +79,8 @@ export async function generateMetadata({ params }) {
     };
 }
 
-export default function Page({ params }) {
-    return <AdDetailClient params={params} />;
+export default async function Page({ params }) {
+    const { id: adId } = params;
+    const ad = await getAd(adId);
+    return <AdDetailClient params={params} initialAd={ad} />;
 }

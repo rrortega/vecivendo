@@ -14,12 +14,15 @@ import {
     Receipt,
     UserPlus,
     Megaphone,
-    Archive
+    Archive,
+    Filter,
+    Calendar
 } from 'lucide-react';
 
 import KPICard from '@/components/console/dashboard/KPICard';
 import KPISection from '@/components/console/dashboard/KPISection';
 import ChartWidget from '@/components/console/dashboard/ChartWidget';
+import CategoryFilterModal from '@/components/console/dashboard/CategoryFilterModal';
 import { useDashboardKPIs } from '@/hooks/useDashboardKPIs';
 import { databases } from '@/lib/appwrite';
 import { useEffect } from 'react';
@@ -33,10 +36,42 @@ export default function DashboardPage() {
     const [dateFilter, setDateFilter] = useState('30days');
     const [residentials, setResidentials] = useState([]);
 
+    // New Filter States
+    const [selectedCountry, setSelectedCountry] = useState('all');
+    const [selectedState, setSelectedState] = useState('all');
+    const [selectedCategories, setSelectedCategories] = useState([]);
+    const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+    // Filter Logic derived from selections
+    const derivedResidentialIds = (() => {
+        // 1. If specific residential is selected, use only that.
+        if (residentialId) return [residentialId];
+
+        // 2. If filtering by state, get all residentials in that state.
+        if (selectedState !== 'all') {
+            return residentials
+                .filter(r => r.provincia_estado === selectedState)
+                .map(r => r.$id);
+        }
+
+        // 3. If filtering by country, get all residentials in that country.
+        if (selectedCountry !== 'all') {
+            return residentials
+                .filter(r => r.country === selectedCountry)
+                .map(r => r.$id);
+        }
+
+        // 4. No location filter -> return null (meaning all) or empty array?
+        // Hook logic: if (residentialIds && residentialIds.length > 0) -> filter.
+        // So passing null or [] means "All".
+        return null;
+    })();
+
     const { kpis, loading, error } = useDashboardKPIs(
         startDate || new Date(),
         endDate || new Date(),
-        residentialId
+        derivedResidentialIds,
+        selectedCategories
     );
 
     // Cargar residenciales
@@ -92,6 +127,10 @@ export default function DashboardPage() {
                 start = lastMonth;
                 end = new Date(now.getFullYear(), now.getMonth(), 0);
                 break;
+            case 'thisYear':
+                start = new Date(now.getFullYear(), 0, 1);
+                end = now;
+                break;
             default:
                 start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
                 end = now;
@@ -103,6 +142,32 @@ export default function DashboardPage() {
 
     const handleResidentialChange = (value) => {
         setResidentialId(value === 'all' ? null : value);
+    };
+
+    // Derived Lists for Filters
+    const uniqueCountries = [...new Set(residentials.map(r => r.country).filter(Boolean))].sort();
+
+    const availableStates = residentials
+        .filter(r => selectedCountry === 'all' || r.country === selectedCountry)
+        .map(r => r.provincia_estado)
+        .filter(Boolean);
+    const uniqueStates = [...new Set(availableStates)].sort();
+
+    const filteredResidentials = residentials.filter(r => {
+        const matchCountry = selectedCountry === 'all' || r.country === selectedCountry;
+        const matchState = selectedState === 'all' || r.provincia_estado === selectedState;
+        return matchCountry && matchState;
+    });
+
+    const handleCountryChange = (val) => {
+        setSelectedCountry(val);
+        setSelectedState('all');
+        setResidentialId(null);
+    };
+
+    const handleStateChange = (val) => {
+        setSelectedState(val);
+        setResidentialId(null);
     };
 
     if (error) {
@@ -144,57 +209,126 @@ export default function DashboardPage() {
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-4xl font-extrabold  mb-2 tracking-tight">
-                    Tablero de Control
-                </h1>
-                <p className="text-lg text-gray-600 ">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+                    <h1 className="text-4xl font-extrabold tracking-tight">
+                        Tablero de Control
+                    </h1>
+                    <div className="flex bg-surface rounded-lg p-1  dark:border-gray-700 overflow-x-auto">
+                        {[
+                            { id: '7days', label: '7 Días' },
+                            { id: '30days', label: '30 Días' },
+                            { id: 'thisMonth', label: 'Mes Actual' },
+                            { id: 'lastMonth', label: 'Mes Pasado' },
+                            { id: 'thisYear', label: 'Año Actual' }
+                        ].map((period) => (
+                            <button
+                                key={period.id}
+                                onClick={() => handleDateFilterChange(period.id)}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${dateFilter === period.id
+                                    ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
+                                    }`}
+                            >
+                                {period.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <p className="text-lg text-gray-600 dark:text-gray-400">
                     Métricas en tiempo real y análisis del sistema
                 </p>
             </div>
 
             {/* Filters */}
-            <div className="bg-surface rounded-2xl  p-6 mb-8 shadow-sm border border-gray-900/20">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Residential Filter */}
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            {/* Filters */}
+            <div className="bg-surface rounded-2xl p-6 mb-8 shadow-sm border border-gray-900/20">
+                <div className="grid grid-cols-12 gap-4">
+                    {/* Country Filter - Col 2 */}
+                    <div className="col-span-12 md:col-span-2">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                            País
+                        </label>
+                        <select
+                            value={selectedCountry}
+                            onChange={(e) => handleCountryChange(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                            <option value="all">Todos</option>
+                            {uniqueCountries.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* State Filter - Col 3 */}
+                    <div className="col-span-12 md:col-span-3">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                            Provincia
+                        </label>
+                        <select
+                            value={selectedState}
+                            onChange={(e) => handleStateChange(e.target.value)}
+                            disabled={selectedCountry === 'all' && uniqueStates.length > 10}
+                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                        >
+                            <option value="all">Todos</option>
+                            {uniqueStates.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Residential Filter - Col 5 */}
+                    <div className="col-span-12 md:col-span-4">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                             Residencial
                         </label>
                         <select
                             value={residentialId || "all"}
                             onChange={(e) => handleResidentialChange(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none"
+                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         >
-                            <option value="all">Todos los residenciales</option>
-                            {residentials.map((res) => (
+                            <option value="all">Todos los residenciales ({filteredResidentials.length})</option>
+                            {filteredResidentials.map((res) => (
                                 <option key={res.$id} value={res.$id}>
                                     {res.nombre}
                                 </option>
                             ))}
                         </select>
                     </div>
-                    {/* Date Range Filter */}
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            Período de Tiempo
+
+                    {/* Category Filter Button - Col 2 */}
+                    <div className="col-span-12 md:col-span-3">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                            Categorías
                         </label>
-                        <select
-                            value={dateFilter}
-                            onChange={(e) => handleDateFilterChange(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none"
+                        <button
+                            onClick={() => setIsFilterModalOpen(true)}
+                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border transition-all text-sm font-medium whitespace-nowrap overflow-hidden ${selectedCategories.length > 0
+                                ? 'bg-primary/10 text-primary border-primary/20'
+                                : 'bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600 hover:border-gray-300'
+                                }`}
                         >
-                            <option value="today">Hoy</option>
-                            <option value="7days">Últimos 7 días</option>
-                            <option value="30days">Últimos 30 días</option>
-                            <option value="90days">Últimos 90 días</option>
-                            <option value="thisMonth">Este mes</option>
-                            <option value="lastMonth">Mes anterior</option>
-                        </select>
+                            <div className="flex items-center gap-2">
+                                <Filter size={16} />
+                                <span>Filtros</span>
+                            </div>
+                            {selectedCategories.length > 0 && (
+                                <span className="bg-primary text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold ml-1">
+                                    {selectedCategories.length}
+                                </span>
+                            )}
+                        </button>
                     </div>
-
-
                 </div>
             </div>
+
+            <CategoryFilterModal
+                isOpen={isFilterModalOpen}
+                onClose={() => setIsFilterModalOpen(false)}
+                selectedCategories={selectedCategories}
+                onApply={setSelectedCategories}
+            />
 
             {/* Loading State */}
             {loading && !kpis && (
@@ -207,7 +341,7 @@ export default function DashboardPage() {
             {kpis && (
                 <>
                     {/* Sección de Anuncios */}
-                    <KPISection title="Anuncios" icon={Package}>
+                    <KPISection title="Anuncios" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
                         <KPICard
                             title="Anuncios Activos"
                             value={kpis.ads.totalActive}
@@ -242,13 +376,14 @@ export default function DashboardPage() {
                             <ChartWidget
                                 title="Anuncios por Categoría"
                                 data={categoryChartData}
-                                type="bar"
+                                type="pie"
+                                variant="rose"
                             />
                         </div>
                     )}
 
                     {/* Sección de Engagement */}
-                    <KPISection title="Engagement" icon={Eye}>
+                    <KPISection title="Engagement" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
                         <KPICard
                             title="Total de Visualizaciones"
                             value={kpis.engagement.totalViews}
@@ -292,7 +427,7 @@ export default function DashboardPage() {
                     )}
 
                     {/* Sección de Pedidos */}
-                    <KPISection title="Pedidos" icon={ShoppingCart}>
+                    <KPISection title="Pedidos" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
                         <KPICard
                             title="Total de Pedidos"
                             value={kpis.orders.totalOrders}
@@ -337,7 +472,7 @@ export default function DashboardPage() {
                     )}
 
                     {/* Sección de Usuarios */}
-                    <KPISection title="Usuarios" icon={Users}>
+                    <KPISection title="Usuarios" gridClassName="grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
                         <KPICard
                             title="Anunciantes Activos"
                             value={kpis.users.activeAdvertisers}
@@ -353,7 +488,7 @@ export default function DashboardPage() {
                     </KPISection>
 
                     {/* Sección de Publicidad Pagada */}
-                    <KPISection title="Publicidad Pagada" icon={Megaphone}>
+                    <KPISection title="Publicidad Pagada" >
                         <KPICard
                             title="Anuncios Pagados Activos"
                             value={kpis.paidAds.activePaidAds}
@@ -379,7 +514,7 @@ export default function DashboardPage() {
                     </KPISection>
 
                     {/* Sección de Calidad */}
-                    <KPISection title="Calidad" icon={Star}>
+                    <KPISection title="Calidad" gridClassName="grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
                         <KPICard
                             title="Total de Reseñas"
                             value={kpis.quality.totalReviews}

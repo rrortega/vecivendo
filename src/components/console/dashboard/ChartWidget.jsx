@@ -11,7 +11,8 @@ import {
     Legend,
     XAxis,
     YAxis,
-    CartesianGrid
+    CartesianGrid,
+    Sector
 } from 'recharts';
 
 // Paleta de colores premium y moderna
@@ -28,9 +29,9 @@ const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-surface border border-gray-100 dark:border-gray-700 shadow-xl rounded-xl p-4">
-                <p className="font-semibold text-gray-900 dark:text-white mb-1">{label}</p>
+                <p className="font-semibold text-gray-900 dark:text-white mb-1">{payload[0].name}</p>
                 <p className="text-indigo-600 dark:text-indigo-400 font-medium">
-                    {payload[0].value.toLocaleString()}
+                    {payload[0].value.toLocaleString()} anuncios
                 </p>
             </div>
         );
@@ -38,7 +39,34 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-export default function ChartWidget({ title, data, type = 'bar', dataKey = 'value', nameKey = 'name' }) {
+const renderRoseShape = (props, maxValue) => {
+    const { cx, cy, innerRadius, startAngle, endAngle, fill, value } = props;
+
+    // Scale radius based on value
+    // Minimum radius for visibility + variable part
+    const minOuterRadius = 90;
+    const maxOuterRadius = 160; // Slightly larger for effect
+
+    const scale = value / maxValue;
+    const outerRadius = minOuterRadius + (maxOuterRadius - minOuterRadius) * scale;
+
+    return (
+        <Sector
+            cx={cx}
+            cy={cy}
+            innerRadius={innerRadius}
+            outerRadius={outerRadius}
+            startAngle={startAngle}
+            endAngle={endAngle}
+            fill={fill}
+            // Add subtle stroke for separation
+            stroke="#fff"
+            strokeWidth={2}
+        />
+    );
+};
+
+export default function ChartWidget({ title, data, type = 'bar', variant = 'default', dataKey = 'value', nameKey = 'name' }) {
     if (!data || data.length === 0) {
         return (
             <div className="bg-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 flex flex-col items-center justify-center h-[400px]">
@@ -61,37 +89,93 @@ export default function ChartWidget({ title, data, type = 'bar', dataKey = 'valu
         switch (type) {
             case 'pie':
                 return (
-                    <ResponsiveContainer width="100%" height={350}>
-                        <PieChart>
-                            <Pie
-                                data={data}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={80}
-                                outerRadius={110}
-                                paddingAngle={5}
-                                dataKey={dataKey}
-                                nameKey={nameKey}
-                                stroke="none"
-                            >
-                                {data.map((entry, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={COLORS[index % COLORS.length]}
-                                        className="hover:opacity-80 transition-opacity duration-300"
-                                    />
+                    <div className="flex flex-col md:flex-row items-center justify-between w-full h-[350px]">
+                        {/* Custom Legend - Left (First Half) */}
+                        {variant === 'rose' && (
+                            <div className="hidden md:flex flex-col gap-2 w-1/4 h-full justify-center overflow-auto pr-2">
+                                {data.slice(0, Math.ceil(data.length / 2)).map((entry, index) => (
+                                    <div key={`legend-left-${index}`} className="flex items-center gap-2 text-sm justify-start">
+                                        <div
+                                            className="w-3 h-3 rounded-full shrink-0"
+                                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                        />
+                                        <span className="truncate text-gray-600 dark:text-gray-300 font-medium text-left" title={entry[nameKey]}>
+                                            {entry[nameKey]}
+                                        </span>
+                                    </div>
                                 ))}
-                            </Pie>
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend
-                                verticalAlign="bottom"
-                                height={36}
-                                iconType="circle"
-                                formatter={(value) => <span className="text-sm font-medium text-gray-600 dark:text-gray-300 ml-1">{value}</span>}
-                            />
-                        </PieChart>
-                    </ResponsiveContainer>
+                            </div>
+                        )}
+
+                        {/* Chart - Use flex-1 to take available space and min-w-0 to handle flex bug */}
+                        <div className={`w-full ${variant === 'rose' ? 'md:flex-1 md:min-w-0 h-full' : 'h-full'}`}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={data}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={variant === 'rose' ? 40 : 80}
+                                        outerRadius={variant === 'rose' ? 120 : 110}
+                                        paddingAngle={variant === 'rose' ? 2 : 5}
+                                        dataKey={dataKey}
+                                        nameKey={nameKey}
+                                        stroke="none"
+                                        shape={variant === 'rose'
+                                            ? (props) => renderRoseShape(props, Math.max(...data.map(d => d[dataKey])))
+                                            : undefined
+                                        }
+                                    >
+                                        {data.map((entry, index) => (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={COLORS[index % COLORS.length]}
+                                                className="hover:opacity-80 transition-opacity duration-300"
+                                            />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip content={<CustomTooltip />} />
+                                    {/* Standard Legend used only for non-rose Pie charts or mobile? 
+                                        Actually, for non-rose standard pies we might want standard behavior.
+                                        But 'rose' is the only variant used here according to user request.
+                                        If type is 'pie' but variant != 'rose', we might want standard legend.
+                                        But currently we are wrapping everything in this DIV.
+                                        Let's stick to the request for the 'rose' chart specifically.
+                                    */}
+                                    {variant !== 'rose' && (
+                                        <Legend
+                                            verticalAlign="bottom"
+                                            height={36}
+                                            iconType="circle"
+                                            formatter={(value) => <span className="text-sm font-medium text-gray-600 dark:text-gray-300 ml-1">{value}</span>}
+                                        />
+                                    )}
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Custom Legend - Right (Second Half) */}
+                        {variant === 'rose' && (
+                            <div className="hidden md:flex flex-col gap-2 w-1/4 h-full justify-center overflow-auto pl-2">
+                                {data.slice(Math.ceil(data.length / 2)).map((entry, index) => {
+                                    const realIndex = index + Math.ceil(data.length / 2);
+                                    return (
+                                        <div key={`legend-right-${index}`} className="flex items-center gap-2 text-sm justify-end">
+                                            <span className="truncate text-gray-600 dark:text-gray-300 font-medium text-right" title={entry[nameKey]}>
+                                                {entry[nameKey]}
+                                            </span>
+                                            <div
+                                                className="w-3 h-3 rounded-full shrink-0"
+                                                style={{ backgroundColor: COLORS[realIndex % COLORS.length] }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 );
+
 
             case 'bar':
             default:

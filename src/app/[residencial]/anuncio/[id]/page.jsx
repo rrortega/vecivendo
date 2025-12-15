@@ -1,8 +1,9 @@
 import { Client, Databases } from "appwrite";
+import { cache } from 'react';
 import AdDetailClient from "./AdDetailClient";
 
 // Helper to fetch ad data
-async function getAd(adId) {
+const getAd = cache(async (adId) => {
     try {
         const client = new Client()
             .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
@@ -16,7 +17,7 @@ async function getAd(adId) {
         console.error("Error fetching ad for metadata:", error);
         return null;
     }
-}
+});
 
 export async function generateMetadata({ params }) {
     const { id: adId } = params;
@@ -93,7 +94,7 @@ export default async function Page({ params }) {
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
                 />
             )}
-            <AdDetailClient params={params} />
+            <AdDetailClient params={params} initialAd={ad} />
         </>
     );
 }

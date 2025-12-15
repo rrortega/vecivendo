@@ -10,7 +10,8 @@ export default function KPICard({
     change,
     icon: Icon,
     format = 'number', // 'number', 'currency', 'percentage'
-    currency = 'USD'
+    currency = 'USD',
+    className = ''
 }) {
     const getTrendIcon = () => {
         if (!change) return <Minus className="w-3 h-3" />;
@@ -53,7 +54,7 @@ export default function KPICard({
     };
 
     return (
-        <div className="bg-surface rounded-2xl shadow-sm border border-gray-900/20 p-6 hover:shadow-md transition-all duration-300 group">
+        <div className={`bg-surface rounded-2xl shadow-sm border border-gray-900/20 p-6 hover:shadow-md transition-all duration-300 group ${className}`}>
             <div className="flex items-start justify-between mb-4">
                 <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 transition-colors">
                     {Icon && <Icon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />}

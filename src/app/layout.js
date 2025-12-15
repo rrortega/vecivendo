@@ -3,6 +3,7 @@ import { Inter, Nunito_Sans } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { CartProvider } from "@/context/CartContext";
+import { OfflineNotification } from "@/components/ui/OfflineNotification";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const nunitoSans = Nunito_Sans({
@@ -93,6 +94,7 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <ToastProvider>
             <CartProvider>
+              <OfflineNotification />
               {children}
             </CartProvider>
           </ToastProvider>

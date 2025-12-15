@@ -1,15 +1,44 @@
-export default function ConsoleDashboard() {
-    return (
-        <div>
-            <h1 className="text-3xl font-bold admin-text mb-6">Dashboard</h1>
+'use client';
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="admin-surface p-6 rounded-xl shadow-sm border admin-border">
-                    <h3 className="text-lg font-semibold admin-text mb-2">Bienvenido</h3>
-                    <p className="admin-text-muted">
-                        Selecciona una opción del menú lateral para comenzar a administrar el contenido.
-                    </p>
-                </div>
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { account } from '@/lib/appwrite'; // Ensure this utility exports the account object
+import { Loader2 } from 'lucide-react';
+
+export default function ConsolePage() {
+    const router = useRouter();
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const user = await account.get();
+                // Check if user has 'admin' label
+                const isAdmin = user.labels && user.labels.includes('admin');
+
+                if (isAdmin) {
+                    router.push('/console/dashboard');
+                } else {
+                    // Not admin, redirect to login
+                    router.push('/login');
+                }
+            } catch (error) {
+                // Not authenticated, redirect to login
+                console.error("Auth check failed", error);
+                router.push('/login');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        checkAuth();
+    }, [router]);
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-sm text-gray-500 font-medium">Verificando acceso...</p>
             </div>
         </div>
     );
