@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Star } from "lucide-react";
-import { client } from "@/lib/appwrite";
-import { Databases, Query } from "appwrite";
+import baas from "@/lib/baas";
 
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -33,29 +32,22 @@ export const ReviewsSection = ({ adId, onModalOpenChange }) => {
         const fetchReviews = async () => {
             if (!adId) return;
 
+            // Define database ID
+            const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+
             try {
-                const databases = new Databases(client);
-                const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+                // Fetch reviews from dedicated endpoint
+                const response = await fetch(`/api/ads/${adId}/reviews?limit=50`);
+                if (!response.ok) throw new Error("Failed to fetch reviews");
 
-                // Fetch all reviews to calculate average and have them ready for modal
-                // In a real large app, we might want to paginate, but for now fetching all is fine or fetching 3 and then more.
-                // Let's fetch a reasonable limit like 50.
-                const response = await databases.listDocuments(
-                    dbId,
-                    "reviews",
-                    [
-                        Query.equal("anuncio_id", adId),
-                        Query.orderDesc("$createdAt"),
-                        Query.limit(50)
-                    ]
-                );
+                const data = await response.json();
 
-                setReviews(response.documents);
+                setReviews(data.documents || []);
 
                 // Calculate average
-                if (response.documents.length > 0) {
-                    const total = response.documents.reduce((acc, review) => acc + review.puntuacion, 0);
-                    setAverageRating((total / response.documents.length).toFixed(1));
+                if (data.documents && data.documents.length > 0) {
+                    const total = data.documents.reduce((acc, review) => acc + review.puntuacion, 0);
+                    setAverageRating((total / data.documents.length).toFixed(1));
                 }
             } catch (error) {
                 console.error("Error fetching reviews:", error);

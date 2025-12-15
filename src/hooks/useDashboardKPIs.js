@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { databases } from '@/lib/appwrite';
-import { Query } from 'appwrite';
+import { client } from '@/lib/appwrite';
+import baas from '@/lib/baas';
 import {
     calculateAdKPIs,
     calculateOrderKPIs,
@@ -32,13 +32,13 @@ export function useDashboardKPIs(startDate, endDate, residentialIds = null, cate
             const { previousStart, previousEnd } = getPreviousPeriod(startDate, endDate);
 
             // Base queries
-            const baseQueryLimit = Query.limit(5000); // Max limit
+            const baseQueryLimit = baas.Query.limit(5000); // Max limit
 
             // Helper to build residential filter
             const getResidentialFilters = () => {
                 const filters = [];
                 if (residentialIds && residentialIds.length > 0) {
-                    filters.push(Query.equal('residencial_id', residentialIds));
+                    filters.push(baas.Query.equal('residencial_id', residentialIds));
                 }
                 return filters;
             };
@@ -48,20 +48,20 @@ export function useDashboardKPIs(startDate, endDate, residentialIds = null, cate
             // Special handling for Ads Category Filter
             const adQueries = [baseQueryLimit, ...residentialFilters];
             if (categories && categories.length > 0) {
-                adQueries.push(Query.search('categorias', categories.join(' ')));
+                adQueries.push(baas.Query.search('categorias', categories.join(' ')));
             }
 
             // --- Queries for Current Period ---
             const currentLogsQuery = [
                 baseQueryLimit,
-                Query.greaterThanEqual('timestamp', startDate.toISOString()),
-                Query.lessThanEqual('timestamp', endDate.toISOString())
+                baas.Query.greaterThanEqual('timestamp', startDate.toISOString()),
+                baas.Query.lessThanEqual('timestamp', endDate.toISOString())
             ];
 
             const currentOrdersQuery = [
                 baseQueryLimit,
-                Query.greaterThanEqual('$createdAt', startDate.toISOString()),
-                Query.lessThanEqual('$createdAt', endDate.toISOString())
+                baas.Query.greaterThanEqual('$createdAt', startDate.toISOString()),
+                baas.Query.lessThanEqual('$createdAt', endDate.toISOString())
             ];
 
             // --- Queries for Previous Period ---
@@ -89,7 +89,7 @@ export function useDashboardKPIs(startDate, endDate, residentialIds = null, cate
             // we MUST pass something to avoid crash. 
             // Ideally, we should fetch "all ads created before previousEnd" for the growth metric.
 
-            // Let's fetch pure lists.
+            // Let's fetch pure lists using BaaS
             const [
                 currentAds,
                 currentLogs,
@@ -103,25 +103,25 @@ export function useDashboardKPIs(startDate, endDate, residentialIds = null, cate
                 previousReviews
             ] = await Promise.all([
                 // Current
-                databases.listDocuments(DB_ID, 'anuncios', adQueries),
-                databases.listDocuments(DB_ID, 'logs', currentLogsQuery),
-                databases.listDocuments(DB_ID, 'pedidos', currentOrdersQuery),
-                databases.listDocuments(DB_ID, 'reviews', [baseQueryLimit]),
-                databases.listDocuments(DB_ID, 'anuncios_pago', [baseQueryLimit]), // Assuming paid ads are few or properly filtered later
-                databases.listDocuments(DB_ID, 'categorias', [Query.limit(100)]), // Fetch categories map
+                baas.get(`databases/${DB_ID}/collections/anuncios/documents`, baas.buildQueries(adQueries)),
+                baas.get(`databases/${DB_ID}/collections/logs/documents`, baas.buildQueries(currentLogsQuery)),
+                baas.get(`databases/${DB_ID}/collections/pedidos/documents`, baas.buildQueries(currentOrdersQuery)),
+                baas.get(`databases/${DB_ID}/collections/reviews/documents`, baas.buildQueries([baseQueryLimit])),
+                baas.get(`databases/${DB_ID}/collections/anuncios_pago/documents`, baas.buildQueries([baseQueryLimit])), // Assuming paid ads are few or properly filtered later
+                baas.get(`databases/${DB_ID}/collections/categorias/documents`, baas.buildQueries([baas.Query.limit(100)])), // Fetch categories map
 
                 // Previous
-                databases.listDocuments(DB_ID, 'logs', [
+                baas.get(`databases/${DB_ID}/collections/logs/documents`, baas.buildQueries([
                     baseQueryLimit,
-                    Query.greaterThanEqual('timestamp', previousStart.toISOString()),
-                    Query.lessThanEqual('timestamp', previousEnd.toISOString())
-                ]),
-                databases.listDocuments(DB_ID, 'pedidos', [
+                    baas.Query.greaterThanEqual('timestamp', previousStart.toISOString()),
+                    baas.Query.lessThanEqual('timestamp', previousEnd.toISOString())
+                ])),
+                baas.get(`databases/${DB_ID}/collections/pedidos/documents`, baas.buildQueries([
                     baseQueryLimit,
-                    Query.greaterThanEqual('$createdAt', previousStart.toISOString()),
-                    Query.lessThanEqual('$createdAt', previousEnd.toISOString())
-                ]),
-                databases.listDocuments(DB_ID, 'reviews', [baseQueryLimit])
+                    baas.Query.greaterThanEqual('$createdAt', previousStart.toISOString()),
+                    baas.Query.lessThanEqual('$createdAt', previousEnd.toISOString())
+                ])),
+                baas.get(`databases/${DB_ID}/collections/reviews/documents`, baas.buildQueries([baseQueryLimit]))
             ]);
 
             // --- Post-processing ---
@@ -214,7 +214,9 @@ export function useDashboardKPIs(startDate, endDate, residentialIds = null, cate
 
     // Subscription for real-time updates
     useEffect(() => {
-        const unsubscribe = databases.client.subscribe(
+        // Keep direct client subscription for realtime only
+        // as BaaS does not support SSE/WS yet
+        const unsubscribe = client.subscribe(
             `databases.${DB_ID}.collections.anuncios.documents`,
             response => {
                 if (response.events.includes('databases.*.collections.*.documents.*.create') ||

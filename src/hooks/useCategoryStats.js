@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { Databases, Query } from "appwrite";
-import { client } from "@/lib/appwrite";
+import baas from "@/lib/baas";
 
 export const useCategoryStats = (residentialId) => {
     const [categories, setCategories] = useState([]);
@@ -28,32 +27,29 @@ export const useCategoryStats = (residentialId) => {
                     setLoading(true);
                 }
 
-                const databases = new Databases(client);
                 const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 
                 // 2. Fetch all active categories
-                const categoriesResponse = await databases.listDocuments(
-                    dbId,
-                    "categorias",
-                    [
-                        Query.equal("activo", true),
-                        Query.orderAsc("orden")
-                    ]
-                );
+                // 2. Fetch all active categories
+                const response = await fetch('/api/categories');
+                if (!response.ok) throw new Error("Failed to fetch categories");
+                const categoriesResponse = await response.json();
 
                 // 3. Fetch all active ads for this residential
                 let activeAds = [];
                 if (residentialId) {
-                    const adsResponse = await databases.listDocuments(
-                        dbId,
-                        "anuncios",
-                        [
-                            Query.equal("residencial", residentialId),
-                            Query.equal("activo", true),
-                            Query.limit(1000) // Fetch up to 1000 ads for counting
-                        ]
-                    );
-                    activeAds = adsResponse.documents;
+                    if (residentialId) {
+                        const params = new URLSearchParams({
+                            residential: residentialId,
+                            active: 'true',
+                            limit: '1000'
+                        });
+
+                        const adsResponse = await fetch(`/api/ads?${params}`);
+                        if (!adsResponse.ok) throw new Error("Failed to fetch ads");
+                        const adsData = await adsResponse.json();
+                        activeAds = adsData.documents;
+                    }
                 }
 
                 // 4. Calculate counts and filter expired ads
@@ -61,13 +57,32 @@ export const useCategoryStats = (residentialId) => {
                 const now = new Date();
 
                 activeAds.forEach(ad => {
-                    const updatedAt = new Date(ad.$updatedAt);
+                    // Use $updatedAt if available, otherwise default to now (assume valid if server returned it)
+                    const updatedAt = ad.$updatedAt ? new Date(ad.$updatedAt) : new Date();
                     const daysValid = ad.dias_vigencia || 30;
                     const expirationDate = new Date(updatedAt.getTime() + daysValid * 24 * 60 * 60 * 1000);
 
                     if (expirationDate > now) {
-                        const catSlug = ad.categoria_slug || (ad.categoria ? ad.categoria.toLowerCase() : null);
+                        let catSlug = ad.categoria_slug;
+
+                        // If no slug on ad, try to match by name from fetched categories
+                        if (!catSlug && ad.categoria) {
+                            const normalizedAdCat = ad.categoria.toLowerCase().trim();
+                            const match = categoriesResponse.documents.find(c =>
+                                c.nombre.toLowerCase() === normalizedAdCat ||
+                                c.slug === normalizedAdCat
+                            );
+                            if (match) {
+                                catSlug = match.slug;
+                            } else {
+                                // Fallback: basic normalization
+                                catSlug = normalizedAdCat.replace(/\s+/g, '-');
+                            }
+                        }
+
                         if (catSlug) {
+                            // Normalize to lowercase for consistency
+                            catSlug = catSlug.toLowerCase();
                             categoryCounts[catSlug] = (categoryCounts[catSlug] || 0) + 1;
                         }
                     }

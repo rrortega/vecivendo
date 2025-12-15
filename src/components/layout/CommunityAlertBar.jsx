@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { client } from "@/lib/appwrite";
-import { Databases, Query } from "appwrite";
+import baas from "@/lib/baas";
 import { X, AlertTriangle, Info, Bell } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -14,63 +13,19 @@ export const CommunityAlertBar = ({ residencialId, residentialSlug }) => {
     useEffect(() => {
         const fetchAlerts = async () => {
             try {
-                const databases = new Databases(client);
-                const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
-                let targetId = residencialId;
+                const identifier = residentialSlug || residencialId;
+                if (!identifier) return;
 
-                // If we only have slug, fetch the ID first
-                if (!targetId && residentialSlug) {
-                    const resDocs = await databases.listDocuments(
-                        dbId,
-                        "residenciales",
-                        [Query.equal("slug", residentialSlug)]
-                    );
-                    if (resDocs.documents.length > 0) {
-                        targetId = resDocs.documents[0].$id;
-                    }
-                }
+                const response = await fetch(`/api/residentials/${identifier}/notices`);
+                if (!response.ok) return;
 
-                if (!targetId) return;
-
-                const response = await databases.listDocuments(
-                    dbId,
-                    "avisos_comunidad",
-                    [
-                        Query.equal("residencial", targetId),
-                        // Query.greaterThanEqual("fecha_fin", new Date().toISOString()) // Only active alerts
-                    ]
-                );
+                const data = await response.json();
 
                 // Filter out dismissed alerts from localStorage
                 const dismissed = JSON.parse(localStorage.getItem("dismissed_alerts") || "[]");
 
-                console.log("Fetched alerts:", response.documents);
-
-                const activeAlerts = response.documents.filter(doc => {
-                    if (!doc) return false;
-
-                    // Check if dismissed
-                    if (dismissed.includes(doc.$id)) return false;
-
-                    // Check expiration
-                    if (doc.duracion_dias && doc.$createdAt) {
-                        try {
-                            const createdDate = new Date(doc.$createdAt);
-                            if (isNaN(createdDate.getTime())) {
-                                console.warn("Invalid date for alert:", doc);
-                                return true; // Keep it visible if date is invalid, or false to hide? Let's keep it.
-                            }
-                            const expirationDate = new Date(createdDate.getTime() + (doc.duracion_dias * 24 * 60 * 60 * 1000));
-                            const now = new Date();
-
-                            if (now > expirationDate) return false;
-                        } catch (e) {
-                            console.error("Error calculating expiration:", e);
-                            return true;
-                        }
-                    }
-
-                    return true;
+                const activeAlerts = (data.documents || []).filter(doc => {
+                    return !dismissed.includes(doc.$id);
                 });
 
                 setAlerts(activeAlerts);

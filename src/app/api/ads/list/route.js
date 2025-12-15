@@ -38,6 +38,8 @@ export async function GET(request) {
         // Build queries
         const queries = [
             Query.equal('residencial', residentialId),
+            // Filter ads older than 7 days
+            Query.greaterThanEqual('$updatedAt', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
         ];
 
         // Sort order
@@ -72,7 +74,24 @@ export async function GET(request) {
         const response = await databases.listDocuments(dbId, COLLECTION_ID, queries);
 
         return NextResponse.json({
-            documents: response.documents,
+            documents: response.documents.map(d => {
+                // delete d['$createdAt'];
+                // delete d['$updatedAt'];
+                delete d['$permissions'];
+                delete d['$databaseId'];
+                delete d['$collectionId'];
+                delete d['$sequence'];
+                delete d['whatsapp_group_id']
+                delete d['imagenes_originales'];
+                delete d['imagen_ia'];
+                delete d['residencial'];
+                delete d['celular_anunciante'];
+                for (var k in d) {
+                    if (null == d[k])
+                        delete d[k]
+                }
+                return d;
+            }),
             total: response.total,
             page,
             limit,

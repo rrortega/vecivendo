@@ -23,12 +23,34 @@ const BAAS_PREFIX = '/api/baas';
  * @returns {Promise<any>} - The response data
  */
 export async function baasGet(path, queries = {}) {
-    const url = new URL(`${BAAS_PREFIX}/${path}`, window.location.origin);
+    // Check if it's a database document request
+    const dbMatch = path.match(/databases\/([^/]+)\/collections\/([^/]+)\/documents\/?(.*)?/);
+
+    let url;
+    if (dbMatch) {
+        // It is a database request, use the centralized 'records' route
+        const [, dbId, colId, rest] = dbMatch;
+        const docId = rest ? rest.replace(/^\//, '') : null;
+
+        url = new URL('/api/records', window.location.origin);
+        url.searchParams.append('dbId', dbId);
+        url.searchParams.append('colId', colId);
+        if (docId) url.searchParams.append('docId', docId);
+
+    } else {
+        // Fallback for non-database paths (storage, etc.) or just use old method?
+        // User said "todas en una ruta". Assuming file storage might still need /files handling.
+        // But the immediate request was for DBs.
+        // Let's keep using /api/baas for non-db things if any, OR just fail?
+        // The user's request focused on "collections". 
+        // For safety, I will keep BAAS_PREFIX for others, but redirect DB to /api/records.
+        url = new URL(`${BAAS_PREFIX}/${path}`, window.location.origin);
+    }
 
     // Append query parameters
     Object.entries(queries).forEach(([key, value]) => {
         if (Array.isArray(value)) {
-            value.forEach((v, i) => url.searchParams.append(`${key}[${i}]`, v));
+            value.forEach((v) => url.searchParams.append(`${key}[]`, v));
         } else if (value !== undefined && value !== null) {
             url.searchParams.append(key, value);
         }
@@ -119,118 +141,36 @@ export async function baasDelete(path) {
  * ```
  */
 export function buildQueries(queryArray) {
-    const queries = {};
-    queryArray.forEach((query, index) => {
-        queries[`queries[${index}]`] = JSON.stringify(query);
-    });
-    return queries;
+    return { queries: queryArray };
 }
 
 /**
  * Helper to create query objects compatible with the BaaS proxy
  * Mimics Appwrite's Query class
  */
+const formatValues = (values) => {
+    return values.map(v => JSON.stringify(v)).join(',');
+};
+
 export const BaasQuery = {
-    equal: (attribute, values) => ({
-        method: 'equal',
-        attribute,
-        values: Array.isArray(values) ? values : [values],
-    }),
-
-    notEqual: (attribute, values) => ({
-        method: 'notEqual',
-        attribute,
-        values: Array.isArray(values) ? values : [values],
-    }),
-
-    lessThan: (attribute, value) => ({
-        method: 'lessThan',
-        attribute,
-        values: [value],
-    }),
-
-    lessThanEqual: (attribute, value) => ({
-        method: 'lessThanEqual',
-        attribute,
-        values: [value],
-    }),
-
-    greaterThan: (attribute, value) => ({
-        method: 'greaterThan',
-        attribute,
-        values: [value],
-    }),
-
-    greaterThanEqual: (attribute, value) => ({
-        method: 'greaterThanEqual',
-        attribute,
-        values: [value],
-    }),
-
-    search: (attribute, value) => ({
-        method: 'search',
-        attribute,
-        values: [value],
-    }),
-
-    orderAsc: (attribute) => ({
-        method: 'orderAsc',
-        attribute,
-    }),
-
-    orderDesc: (attribute) => ({
-        method: 'orderDesc',
-        attribute,
-    }),
-
-    limit: (value) => ({
-        method: 'limit',
-        values: [value],
-    }),
-
-    offset: (value) => ({
-        method: 'offset',
-        values: [value],
-    }),
-
-    contains: (attribute, values) => ({
-        method: 'contains',
-        attribute,
-        values: Array.isArray(values) ? values : [values],
-    }),
-
-    isNull: (attribute) => ({
-        method: 'isNull',
-        attribute,
-    }),
-
-    isNotNull: (attribute) => ({
-        method: 'isNotNull',
-        attribute,
-    }),
-
-    between: (attribute, start, end) => ({
-        method: 'between',
-        attribute,
-        values: [start, end],
-    }),
-
-    startsWith: (attribute, value) => ({
-        method: 'startsWith',
-        attribute,
-        values: [value],
-    }),
-
-    endsWith: (attribute, value) => ({
-        method: 'endsWith',
-        attribute,
-        values: [value],
-    }),
-
-    select: (attributes) => ({
-        method: 'select',
-        values: Array.isArray(attributes) ? attributes : [attributes],
-    }),
+    equal: (attribute, value) => `equal("${attribute}",[${formatValues(Array.isArray(value) ? value : [value])}])`,
+    notEqual: (attribute, value) => `notEqual("${attribute}",[${formatValues(Array.isArray(value) ? value : [value])}])`,
+    lessThan: (attribute, value) => `lessThan("${attribute}",[${formatValues([value])}])`,
+    lessThanEqual: (attribute, value) => `lessThanEqual("${attribute}",[${formatValues([value])}])`,
+    greaterThan: (attribute, value) => `greaterThan("${attribute}",[${formatValues([value])}])`,
+    greaterThanEqual: (attribute, value) => `greaterThanEqual("${attribute}",[${formatValues([value])}])`,
+    search: (attribute, value) => `search("${attribute}",[${formatValues([value])}])`,
+    orderAsc: (attribute) => `orderAsc("${attribute}")`,
+    orderDesc: (attribute) => `orderDesc("${attribute}")`,
+    limit: (value) => `limit(${value})`,
+    offset: (value) => `offset(${value})`,
+    contains: (attribute, value) => `contains("${attribute}",[${formatValues(Array.isArray(value) ? value : [value])}])`,
+    isNull: (attribute) => `isNull("${attribute}")`,
+    isNotNull: (attribute) => `isNotNull("${attribute}")`,
+    between: (attribute, start, end) => `between("${attribute}",[${formatValues([start, end])}])`,
+    startsWith: (attribute, value) => `startsWith("${attribute}",[${formatValues([value])}])`,
+    endsWith: (attribute, value) => `endsWith("${attribute}",[${formatValues([value])}])`,
+    select: (attributes) => `select([${formatValues(Array.isArray(attributes) ? attributes : [attributes])}])`,
 };
 
 export default {

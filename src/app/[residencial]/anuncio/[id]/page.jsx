@@ -1,23 +1,24 @@
-import { Client, Databases } from "appwrite";
+import { databases } from "@/lib/appwrite-server";
 import { cache } from 'react';
 import AdDetailClient from "./AdDetailClient";
 
 // Helper to fetch ad data
-const getAd = cache(async (adId) => {
-    try {
-        const client = new Client()
-            .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
-            .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+import { unstable_cache } from 'next/cache';
 
-        const databases = new Databases(client);
-        const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
-
-        return await databases.getDocument(dbId, "anuncios", adId);
-    } catch (error) {
-        console.error("Error fetching ad for metadata:", error);
-        return null;
-    }
-});
+// Helper to fetch ad data with ISR cache
+const getAd = unstable_cache(
+    async (adId) => {
+        try {
+            const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+            return await databases.getDocument(dbId, "anuncios", adId);
+        } catch (error) {
+            console.error("Error fetching ad for metadata:", error);
+            return null;
+        }
+    },
+    ['ad-details'], // Key prefix
+    { revalidate: 60, tags: ['ads'] } // Cache for 60 seconds, tag for revalidation
+);
 
 export async function generateMetadata({ params }) {
     const { id: adId } = params;

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { client } from "@/lib/appwrite";
-import { Databases, Query } from "appwrite";
+import baas from "@/lib/baas";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { CommunityAlertBar } from "@/components/layout/CommunityAlertBar";
 import { Button } from "@/components/ui/Button";
@@ -79,15 +78,20 @@ export default function AdDetailPage({ params, initialAd }) {
     };
 
     // Calculate expiration
-    const updatedAt = ad ? new Date(ad.$updatedAt) : null;
-    const validityDays = ad?.dias_vigencia || 7;
-    const expirationDate = updatedAt ? new Date(updatedAt.getTime() + validityDays * 24 * 60 * 60 * 1000) : null;
-    const now = new Date();
-    const timeRemaining = expirationDate ? expirationDate - now : 0;
-    const daysRemaining = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
-    const hoursRemaining = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const updatedAt = ad && ad.$updatedAt ? new Date(ad.$updatedAt) : null;
+    const expirationDays = 6; // Strict 6 days expiration as per requirements
+    // Calculate expiration date based on updatedAt + 6 days
+    const expirationDate = updatedAt ? new Date(updatedAt.getTime() + expirationDays * 24 * 60 * 60 * 1000) : null;
 
-    const isExpired = timeRemaining <= 0;
+    const now = new Date();
+    // Calculate time remaining
+    const timeRemaining = expirationDate ? expirationDate - now : 0;
+
+    // Calculate display values
+    const daysRemaining = Math.max(0, Math.floor(timeRemaining / (1000 * 60 * 60 * 24)));
+    const hoursRemaining = Math.max(0, Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
+
+    const isExpired = !expirationDate || timeRemaining <= 0;
     const isActive = ad?.activo && !isExpired;
 
     useEffect(() => {
@@ -134,11 +138,18 @@ export default function AdDetailPage({ params, initialAd }) {
                 // We can let this run in background to fetch related data.
 
 
-                const databases = new Databases(client);
                 const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 
                 // 1. Fetch Ad Details
-                const adData = await databases.getDocument(dbId, "anuncios", adId);
+                // const adData = await baas.get(`databases/${dbId}/collections/anuncios/documents/${adId}`);
+
+                const adRes = await fetch(`/api/ads/${adId}`);
+                if (!adRes.ok) {
+                    if (adRes.status === 404) throw new Error("Anuncio no encontrado");
+                    throw new Error("Error cargando anuncio");
+                }
+                const adData = await adRes.json();
+
 
                 let parsedVariants = [];
                 // 2. Parse variants
@@ -210,7 +221,7 @@ export default function AdDetailPage({ params, initialAd }) {
                 let fetchedAdvertiserInfo = null;
                 let fetchedRelated = [];
 
-                // Advertiser
+                // Advertiser lookup
                 if (adData.celular_anunciante) {
                     try {
                         const res = await fetch(`/api/users/lookup?phone=${encodeURIComponent(adData.celular_anunciante)}`);
@@ -221,35 +232,19 @@ export default function AdDetailPage({ params, initialAd }) {
                     } catch (err) { console.error("Error looking up advertiser:", err); }
                 }
 
-                // Related Ads
+                // Related Ads & Cross Promo
                 try {
                     let relatedList = [];
                     let crossList = [];
 
-                    // Related (Same Advertiser)
-                    let queryField = null;
-                    let queryValue = null;
-
-                    if (adData.celular) { queryField = 'celular'; queryValue = adData.celular; }
-                    else if (adData.userId) { queryField = 'userId'; queryValue = adData.userId; }
-                    else if (adData.user_id) { queryField = 'user_id'; queryValue = adData.user_id; }
-                    else if (adData.anuncianteId) { queryField = 'anuncianteId'; queryValue = adData.anuncianteId; }
-                    else if (adData.celular_anunciante) { queryField = 'celular_anunciante'; queryValue = adData.celular_anunciante; }
-
-                    if (queryField && queryValue) {
-                        const res = await databases.listDocuments(
-                            dbId, "anuncios",
-                            [
-                                Query.equal(queryField, queryValue),
-                                Query.equal("activo", true),
-                                Query.notEqual("$id", adId),
-                                Query.limit(6)
-                            ]
-                        );
-                        relatedList = res.documents.map(doc => ({ ...doc, isPaid: false }));
+                    // Fetch related ads from same seller via new BFF route
+                    const relatedRes = await fetch(`/api/ads/${adId}/others`);
+                    if (relatedRes.ok) {
+                        const relatedData = await relatedRes.json();
+                        relatedList = (relatedData.documents || []).map(doc => ({ ...doc, isPaid: false }));
                     }
 
-                    // Cross Promo
+                    // Cross Promo (Paid Ads)
                     const categorySlug = adData.categoria_slug || adData.categoria || '';
                     if (categorySlug) {
                         const params = new URLSearchParams({
@@ -318,6 +313,48 @@ export default function AdDetailPage({ params, initialAd }) {
         };
 
     }, [adId, variant_slug]);
+
+    // Handle Image Modal Closing (Esc & Back Button)
+    useEffect(() => {
+        if (isImageModalOpen) {
+            // Push state to history so back button closes modal instead of navigating away
+            window.history.pushState({ modalOpen: true }, '');
+
+            const handlePopState = () => {
+                setIsImageModalOpen(false);
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Escape') {
+                    setIsImageModalOpen(false);
+                    // If we closed via ESC, we might need to go back in history if we pushed state
+                    // But strictly speaking, pushing state implies we EXPECT back button usage.
+                    // If user presses ESC, history remains forward one step. 
+                    // Usually better to just go back:
+                    if (window.history.state?.modalOpen) {
+                        window.history.back();
+                    }
+                }
+            };
+
+            window.addEventListener('popstate', handlePopState);
+            window.addEventListener('keydown', handleKeyDown);
+
+            return () => {
+                window.removeEventListener('popstate', handlePopState);
+                window.removeEventListener('keydown', handleKeyDown);
+            };
+        }
+    }, [isImageModalOpen]);
+
+    // Helper to close modal and fix history
+    const handleCloseModal = () => {
+        setIsImageModalOpen(false);
+        // If we have our modal state in history, go back to clean it up
+        if (window.history.state?.modalOpen) {
+            window.history.back();
+        }
+    };
 
     const { residential: residentialData } = useResidential(residencialSlug);
     const residentialName = residentialData?.nombre || residencialSlug;
@@ -495,13 +532,13 @@ export default function AdDetailPage({ params, initialAd }) {
                             {/* Share & Favorite buttons */}
                             <div className="absolute top-4 right-4 flex gap-2">
                                 <button
-                                    onClick={handleShare}
+                                    onClick={(e) => { e.stopPropagation(); handleShare(); }}
                                     className="p-3 bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-transparent hover:border-primary transition-all hover:scale-110"
                                 >
                                     <Share2 size={20} className="text-gray-700" />
                                 </button>
                                 <button
-                                    onClick={(e) => ad && toggleFavorite(e, ad.$id)}
+                                    onClick={(e) => { e.stopPropagation(); ad && toggleFavorite(e, ad.$id); }}
                                     className={`p-3 backdrop-blur-sm rounded-full shadow-lg transition-all hover:scale-110 border border-transparent hover:border-red-500 ${isFavorite(ad.$id) ? 'bg-white text-red-500' : 'bg-white/90 text-gray-700'}`}
                                 >
                                     <Heart size={20} className={isFavorite(ad.$id) ? "fill-current" : ""} />
@@ -850,9 +887,9 @@ export default function AdDetailPage({ params, initialAd }) {
 
             {/* Fullscreen Image Modal */}
             {isImageModalOpen && (
-                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setIsImageModalOpen(false)}>
+                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={handleCloseModal}>
                     <button
-                        onClick={() => setIsImageModalOpen(false)}
+                        onClick={handleCloseModal}
                         className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-[110]"
                     >
                         <X size={32} />

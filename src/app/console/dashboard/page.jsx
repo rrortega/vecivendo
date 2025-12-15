@@ -24,7 +24,6 @@ import KPISection from '@/components/console/dashboard/KPISection';
 import ChartWidget from '@/components/console/dashboard/ChartWidget';
 import CategoryFilterModal from '@/components/console/dashboard/CategoryFilterModal';
 import { useDashboardKPIs } from '@/hooks/useDashboardKPIs';
-import { databases } from '@/lib/appwrite';
 import { useEffect } from 'react';
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE;
@@ -78,9 +77,11 @@ export default function DashboardPage() {
     useEffect(() => {
         async function fetchResidentials() {
             try {
-                const response = await databases.listDocuments(
-                    DATABASE_ID,
-                    'residenciales'
+                // Using BaaS instead of direct Appwrite client
+                const baas = (await import('@/lib/baas')).default;
+
+                const response = await baas.get(
+                    `databases/${DATABASE_ID}/collections/residenciales/documents`
                 );
                 setResidentials(response.documents);
             } catch (error) {

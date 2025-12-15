@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { databases, dbId, adsCollectionId } from '@/lib/appwrite-server';
+import { cleanDocument } from '@/lib/response-cleaner';
 
 // GET /api/ads/[id] - Obtener anuncio por ID
 export async function GET(request, { params }) {
@@ -12,7 +13,7 @@ export async function GET(request, { params }) {
 
         console.log('✅ [API] Anuncio obtenido:', document.titulo);
 
-        return NextResponse.json(document);
+        return NextResponse.json(cleanDocument(document));
 
     } catch (error) {
         console.error('❌ [API] Error obteniendo anuncio:', {

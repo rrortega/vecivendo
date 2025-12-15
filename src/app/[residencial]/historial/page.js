@@ -152,7 +152,7 @@ export default function HistoryPage({ params }) {
     return (
         <div className="min-h-screen bg-background pb-20 md:pb-0 transition-all duration-300" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
             <CommunityAlertBar residentialSlug={residencial} />
-            <HomeHeader residencialName={residentialName} residentialSlug={residencial} />
+            <HomeHeader residencialName={residentialName} residentialSlug={residencial} showFilters={false} />
 
             <div className="max-w-7xl mx-auto pt-20 md:pt-20 px-4 md:px-6">
                 <div className="flex items-center gap-3 mb-8">

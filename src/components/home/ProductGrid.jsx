@@ -439,7 +439,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                         <React.Fragment key={product.$id}>
                             <Link
                                 href={adLink}
-                                className={`group bg-surface rounded-xl overflow-hidden border border-gray-200 dark:border-border shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative ${viewMode === "list" ? "flex flex-row h-40 md:h-48" : "aspect-[3/4]"
+                                className={`group bg-surface rounded-xl overflow-hidden border border-gray-500/30   shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative ${viewMode === "list" ? "flex flex-row h-40 md:h-48" : "aspect-[3/4]"
                                     }`}
                             >
                                 <div className={`${viewMode === "list" ? "w-40 md:w-56 shrink-0 relative" : "absolute inset-0 z-0"} overflow-hidden bg-gray-100 dark:bg-white/5`}>
@@ -472,18 +472,18 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                 {/* Category Badge - Changed to Top Left */}
                                 {product.categoria && viewMode === "grid" && (
                                     <div className="absolute top-2 left-2 z-20">
-                                        <span className="inline-block px-2 py-1 text-[10px] font-medium bg-surface/90 backdrop-blur-md text-text-main rounded-md shadow-sm border border-border/50">
+                                        <span className="inline-block px-2 py-1 text-[10px] font-medium bg-surface/50 backdrop-blur-md text-text-main rounded-md shadow-sm border border-border/20">
                                             {product.categoria}
                                         </span>
                                     </div>
                                 )}
 
                                 <div className={`
-                                    ${viewMode === "list"
+                                        ${viewMode === "list"
                                         ? "p-4 flex flex-col flex-1 justify-between relative"
-                                        : "absolute bottom-0 left-0 right-0 z-10 p-4 pt-20 bg-gradient-to-t from-white via-white/60 to-transparent dark:from-zinc-950 dark:via-zinc-950/60 dark:to-transparent"
+                                        : "absolute bottom-0 left-0 right-0 z-10 p-4 pt-24 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-zinc-950 dark:via-zinc-950/50  dark:to-transparent"
                                     }
-                                `}>
+                                    `}>
                                     <div className="flex items-start justify-between gap-2 mb-1">
                                         <h3 className={`font-medium leading-tight transition-colors ${viewMode === "list"
                                             ? "text-lg line-clamp-2 text-text-main group-hover:text-primary"
@@ -509,7 +509,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                         <div className="flex flex-col">
                                             {viewMode === 'list' && (<span className={`text-xs mb-0.5 ${viewMode === 'list' ? 'text-text-secondary' : 'text-gray-600 dark:text-gray-400'}`}>Precio</span>)}
                                             <span className={`text-lg font-bold text-primary`}>
-                                                <span className="text-xs font-normal text-white drop-shadow-md mr-1">
+                                                <span className="text-xs font-normal text-gray-500 dark:text-gray-400 mr-1">
                                                     {product.variants?.length > 1 ? "desde" : "por"}
                                                 </span>
                                                 {formatPrice(product.precio)}

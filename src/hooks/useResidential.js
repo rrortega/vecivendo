@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { Databases, Query } from "appwrite";
-import { client } from "@/lib/appwrite";
+
 
 export const useResidential = (slug) => {
     const [residential, setResidential] = useState(null);
@@ -34,17 +33,16 @@ export const useResidential = (slug) => {
                 // Only set loading true if we didn't have cache
                 if (!cachedData) setLoading(true);
 
-                const databases = new Databases(client);
-                const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+                const response = await fetch(`/api/residentials?slug=${slug}`);
 
-                const response = await databases.listDocuments(
-                    dbId,
-                    "residenciales",
-                    [Query.equal("slug", slug)]
-                );
+                if (!response.ok) {
+                    if (response.status === 404) throw new Error("Residential not found");
+                    throw new Error("Failed to fetch residential");
+                }
 
-                if (response.documents.length > 0) {
-                    const newData = response.documents[0];
+                const newData = await response.json();
+
+                if (newData) {
                     setResidential(newData);
                     localStorage.setItem(cacheKey, JSON.stringify(newData));
                 } else {

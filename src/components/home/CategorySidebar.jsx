@@ -16,7 +16,8 @@ import {
     Package,
     Wrench,
     Sofa,
-    LayoutGrid
+    LayoutGrid,
+    X
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as LucideIcons from "lucide-react";
@@ -66,6 +67,12 @@ export const CategorySidebar = ({ residentialId }) => {
         router.replace(`?${params.toString()}`);
     };
 
+    const clearSearch = () => {
+        const params = new URLSearchParams(searchParams);
+        params.delete("search");
+        router.replace(`?${params.toString()}`);
+    };
+
     return (
         <aside className="hidden md:block w-64 shrink-0 sticky top-24 h-[calc(100vh-6rem)] overflow-y-auto pr-6">
             {/* Search Input - For searching products */}
@@ -77,8 +84,16 @@ export const CategorySidebar = ({ residentialId }) => {
                         placeholder="Buscar productos..."
                         value={searchQuery}
                         onChange={handleSearchChange}
-                        className="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-text-main placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+                        className="w-full bg-surface border border-border rounded-xl pl-10 pr-10 py-2.5 text-sm text-text-main placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                     />
+                    {searchQuery && (
+                        <button
+                            onClick={clearSearch}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-main p-1 rounded-full hover:bg-surface-hover transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
                 </div>
             </div>
 

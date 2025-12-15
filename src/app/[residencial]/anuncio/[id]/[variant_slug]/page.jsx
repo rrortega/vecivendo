@@ -1,5 +1,5 @@
 import AdDetailClient from "../AdDetailClient";
-import { Client, Databases } from "appwrite";
+import { databases } from "@/lib/appwrite-server";
 import { cache } from 'react';
 
 // Helper to fetch ad data (reused from parent page logic if needed, or just let client handle it)
@@ -8,13 +8,7 @@ import { cache } from 'react';
 
 const getAd = cache(async (adId) => {
     try {
-        const client = new Client()
-            .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
-            .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
-
-        const databases = new Databases(client);
         const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
-
         return await databases.getDocument(dbId, "anuncios", adId);
     } catch (error) {
         console.error("Error fetching ad for metadata:", error);
