@@ -5,7 +5,7 @@ import { databases, storage } from "@/lib/appwrite";
 import { Query } from "appwrite"; // Added Query
 import { useToast } from "@/context/ToastContext";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, BarChart2, Edit, Save, Trash2, ScanLine, Layout, CreditCard, Target, AlertCircle, Plus, Calendar, Eye, MousePointerClick, Percent, TrendingUp, ExternalLink, FileText, Camera, Download } from "lucide-react"; // Expanded icons
+import { ChevronLeft, BarChart2, Edit, Save, Trash2, ScanLine, Layout, CreditCard, Target, AlertCircle, Plus, Calendar, Eye, MousePointerClick, Percent, TrendingUp, ExternalLink, FileText, Camera, Download, Loader2 } from "lucide-react"; // Expanded icons
 import ImageUpload from "@/components/console/ImageUpload";
 import { countries as countriesData } from "@/utils/countries"; // Added countries
 import { getAdAnalytics } from "@/lib/analytics";
@@ -25,6 +25,7 @@ const PaidAdAnalytics = ({ ad }) => {
     const [loading, setLoading] = useState(true);
     const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, data: null });
     const [showExportMenu, setShowExportMenu] = useState(false); // Dropdown state
+    const [processingExport, setProcessingExport] = useState(false); // Export processing state
 
     useEffect(() => {
         const fetchData = async () => {
@@ -82,9 +83,24 @@ const PaidAdAnalytics = ({ ad }) => {
     const { showToast } = useToast();
 
     const prepareForCapture = async () => {
-        // 1. Force Dark Mode
-        const wasDark = document.documentElement.classList.contains('dark');
-        if (!wasDark) document.documentElement.classList.add('dark');
+        // 1. Force Dark Mode on HTML, Body, and Main
+        const html = document.documentElement;
+        const body = document.body;
+        const main = document.querySelector('main');
+
+        const wasDark = html.classList.contains('dark');
+        const bodyWasDark = body.classList.contains('dark');
+        const mainWasDark = main ? main.classList.contains('dark') : false;
+
+        if (!wasDark) html.classList.add('dark');
+        if (!bodyWasDark) body.classList.add('dark');
+        if (main && !mainWasDark) main.classList.add('dark');
+
+        // Force 'dark' class on the container itself
+        const containerWasDark = dashboardRef.current?.classList.contains('dark');
+        if (dashboardRef.current && !containerWasDark) {
+            dashboardRef.current.classList.add('dark');
+        }
 
         // 2. Hide Scrollbars globally
         const style = document.createElement('style');
@@ -96,13 +112,19 @@ const PaidAdAnalytics = ({ ad }) => {
         document.head.appendChild(style);
 
         // 3. Wait for styles to apply
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 800));
 
-        return { wasDark, style };
+        return { wasDark, bodyWasDark, mainWasDark, containerWasDark, style };
     };
 
-    const restoreAfterCapture = ({ wasDark, style }) => {
+    const restoreAfterCapture = ({ wasDark, bodyWasDark, mainWasDark, containerWasDark, style }) => {
         if (!wasDark) document.documentElement.classList.remove('dark');
+        if (!bodyWasDark) document.body.classList.remove('dark');
+
+        const main = document.querySelector('main');
+        if (main && !mainWasDark) main.classList.remove('dark');
+
+        if (dashboardRef.current && !containerWasDark) dashboardRef.current.classList.remove('dark');
         if (style && style.parentNode) style.parentNode.removeChild(style);
     };
 
@@ -110,6 +132,7 @@ const PaidAdAnalytics = ({ ad }) => {
         if (!dashboardRef.current) return;
         let captureState = null;
         try {
+            setProcessingExport(true);
             setShowExportMenu(false); // Close dropdown
             captureState = await prepareForCapture();
 
@@ -128,6 +151,7 @@ const PaidAdAnalytics = ({ ad }) => {
             showToast("Error al generar la imagen", "error");
         } finally {
             if (captureState) restoreAfterCapture(captureState);
+            setProcessingExport(false);
         }
     };
 
@@ -135,6 +159,7 @@ const PaidAdAnalytics = ({ ad }) => {
         if (!dashboardRef.current) return;
         let captureState = null;
         try {
+            setProcessingExport(true);
             setShowExportMenu(false); // Close dropdown
             captureState = await prepareForCapture();
 
@@ -158,6 +183,7 @@ const PaidAdAnalytics = ({ ad }) => {
             showToast("Error al generar el PDF", "error");
         } finally {
             if (captureState) restoreAfterCapture(captureState);
+            setProcessingExport(false);
         }
     };
 
@@ -174,24 +200,25 @@ const PaidAdAnalytics = ({ ad }) => {
                         <div className="relative">
                             <button
                                 onClick={() => setShowExportMenu(!showExportMenu)}
-                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-primary-500 transition-colors flex items-center gap-2"
+                                disabled={processingExport}
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-primary-500 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Descargar Reporte"
                                 type="button"
                             >
-                                <Download size={20} />
+                                {processingExport ? <Loader2 size={20} className="animate-spin text-primary-500" /> : <Download size={20} />}
                             </button>
 
                             {showExportMenu && (
                                 <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
                                     <button
                                         onClick={handleDownloadImage}
-                                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 admin-text"
+                                        className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                                     >
                                         <Camera size={16} /> Descargar Imagen
                                     </button>
                                     <button
                                         onClick={handleDownloadPDF}
-                                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 admin-text border-t border-gray-100 dark:border-gray-700"
+                                        className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700 transition-colors"
                                     >
                                         <FileText size={16} /> Descargar PDF
                                     </button>

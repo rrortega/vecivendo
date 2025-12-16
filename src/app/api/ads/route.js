@@ -25,7 +25,7 @@ export async function GET(request) {
 
         // Filter ads updated in the last 7 days
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        queries.push(Query.greaterThanEqual("$updatedAt", sevenDaysAgo));
+        queries.push(Query.greaterThanEqual("last_capture", sevenDaysAgo));
 
         const sort = searchParams.get('sort') || '$createdAt';
         const order = searchParams.get('order') || 'desc';

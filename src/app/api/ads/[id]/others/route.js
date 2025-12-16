@@ -33,7 +33,7 @@ export async function GET(request, { params }) {
                 Query.equal(queryField, queryValue),
                 Query.equal('activo', true),
                 Query.limit(5), // Fetch a few more to allow for filtering
-                Query.orderDesc('$updatedAt')
+                Query.orderDesc('last_capture')
             ]
         );
 

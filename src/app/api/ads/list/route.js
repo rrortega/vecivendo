@@ -39,7 +39,7 @@ export async function GET(request) {
         const queries = [
             Query.equal('residencial', residentialId),
             // Filter ads older than 7 days
-            Query.greaterThanEqual('$updatedAt', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+            Query.greaterThanEqual('last_capture', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
         ];
 
         // Sort order
@@ -76,7 +76,7 @@ export async function GET(request) {
         return NextResponse.json({
             documents: response.documents.map(d => {
                 // delete d['$createdAt'];
-                // delete d['$updatedAt'];
+                delete d['$updatedAt'];
                 delete d['$permissions'];
                 delete d['$databaseId'];
                 delete d['$collectionId'];
