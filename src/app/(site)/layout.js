@@ -1,4 +1,4 @@
-import "./app.css";
+import "../app.css";
 import { Inter, Nunito_Sans } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
@@ -61,7 +61,39 @@ export const viewport = {
   userScalable: false, // Mobile-app like feel
 };
 
-export default function RootLayout({ children }) {
+import { databases } from "@/lib/server/appwrite";
+import { Query } from "node-appwrite";
+import parse from "html-react-parser";
+
+async function getGlobalScripts() {
+  try {
+    const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+    const collectionId = "configuracion_global";
+
+    // Using server-side SDK (node-appwrite)
+    const response = await databases.listDocuments(dbId, collectionId, [
+      Query.limit(1)
+    ]);
+
+    if (response.documents.length > 0) {
+      const doc = response.documents[0];
+      console.log("Global scripts fetched successfully"); // Debug log relative to system, visible in server logs
+      return {
+        header: doc.scripts_header || "",
+        body: doc.scripts_body || ""
+      };
+    } else {
+      console.log("No global configuration document found");
+    }
+  } catch (error) {
+    console.error("Error fetching global scripts:", error);
+  }
+  return { header: "", body: "" };
+}
+
+export default async function RootLayout({ children }) {
+  const { header: scriptsHeader, body: scriptsBody } = await getGlobalScripts();
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -84,8 +116,14 @@ export default function RootLayout({ children }) {
     ]
   };
 
+  const hasHeaderScripts = scriptsHeader && scriptsHeader.trim().length > 0;
+  const hasBodyScripts = scriptsBody && scriptsBody.trim().length > 0;
+
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        {hasHeaderScripts ? parse(scriptsHeader) : null}
+      </head>
       <body className={`${inter.variable} ${nunitoSans.variable} font-sans bg-background text-text-secondary antialiased`}>
         <script
           type="application/ld+json"
@@ -99,6 +137,7 @@ export default function RootLayout({ children }) {
             </CartProvider>
           </ToastProvider>
         </ThemeProvider>
+        {hasBodyScripts ? parse(scriptsBody) : null}
       </body>
     </html>
   );

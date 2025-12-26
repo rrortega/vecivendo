@@ -17,6 +17,7 @@
     "dotenv": "^17.2.3",
     "framer-motion": "^12.23.25",
     "gray-matter": "^4.0.3",
+    "html-react-parser": "^5.2.11",
     "html-to-image": "^1.11.13",
     "jimp": "^1.6.0",
     "jspdf": "^3.0.4",

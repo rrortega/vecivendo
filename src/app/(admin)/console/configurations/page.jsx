@@ -17,6 +17,8 @@ export default function ConfigurationsPage() {
         msg_review: "",
         msg_solicitud_residencial: "",
         msg_compartir_anuncio: "",
+        scripts_header: "",
+        scripts_body: "",
     });
     const [initialConfig, setInitialConfig] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -91,6 +93,8 @@ export default function ConfigurationsPage() {
                     msg_review: doc.msg_review || "",
                     msg_solicitud_residencial: doc.msg_solicitud_residencial || "",
                     msg_compartir_anuncio: doc.msg_compartir_anuncio || "",
+                    scripts_header: doc.scripts_header || "",
+                    scripts_body: doc.scripts_body || "",
                 };
                 setConfig(fetchedConfig);
                 setInitialConfig(fetchedConfig);
@@ -331,6 +335,15 @@ export default function ConfigurationsPage() {
                 >
                     Plantillas de Mensajes
                 </button>
+                <button
+                    onClick={() => setActiveTab("javascript")}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === "javascript"
+                        ? "border-primary-500 text-primary-600 dark:text-primary-400"
+                        : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                        }`}
+                >
+                    Javascript
+                </button>
             </div>
 
             <form id="config-form" onSubmit={handleSubmit} className="admin-surface rounded-xl shadow-sm border admin-border p-6">
@@ -528,6 +541,56 @@ export default function ConfigurationsPage() {
                                     Vista Previa (WhatsApp)
                                 </label>
                                 <WhatsAppSimulator />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Javascript Tab Content */}
+                <div className={activeTab === "javascript" ? "block space-y-8" : "hidden"}>
+                    <div className="space-y-6">
+                        <div className="border-b admin-border pb-2">
+                            <h2 className="text-lg font-semibold admin-text">
+                                Inyección de Javascript
+                            </h2>
+                            <p className="text-sm admin-text-muted mt-1">
+                                Agrega scripts personalizados que se ejecutarán en toda la aplicación.
+                            </p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium admin-text mb-2">
+                                    Scripts en Header (&lt;head&gt;)
+                                </label>
+                                <p className="text-xs text-gray-500 mb-2">
+                                    Estos scripts se cargarán en la sección &lt;head&gt; de la página. Ideal para analytics, meta tags, etc.
+                                </p>
+                                <textarea
+                                    name="scripts_header"
+                                    value={config.scripts_header}
+                                    onChange={handleChange}
+                                    rows={10}
+                                    placeholder="<!-- Google Analytics -->&#10;<script>...</script>"
+                                    className="w-full px-4 py-3 rounded-lg border admin-border bg-gray-50 dark:bg-gray-800 admin-text focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all font-mono text-xs resize-y"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium admin-text mb-2">
+                                    Scripts en Body (&lt;body&gt;)
+                                </label>
+                                <p className="text-xs text-gray-500 mb-2">
+                                    Estos scripts se cargarán al final del &lt;body&gt;. Útil para widgets de chat, tracking pixels, etc.
+                                </p>
+                                <textarea
+                                    name="scripts_body"
+                                    value={config.scripts_body}
+                                    onChange={handleChange}
+                                    rows={10}
+                                    placeholder="<script>...</script>"
+                                    className="w-full px-4 py-3 rounded-lg border admin-border bg-gray-50 dark:bg-gray-800 admin-text focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all font-mono text-xs resize-y"
+                                />
                             </div>
                         </div>
                     </div>
