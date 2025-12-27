@@ -41,6 +41,8 @@ export default function AdDetailPage({ params, initialAd }) {
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [showOriginals, setShowOriginals] = useState(false);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    // New state for image loading indicator
+    const [isMainImageLoading, setIsMainImageLoading] = useState(true);
     const variantRefs = useRef([]);
 
     // Scroll to selected variant on mobile
@@ -347,6 +349,21 @@ export default function AdDetailPage({ params, initialAd }) {
         }
     }, [isImageModalOpen]);
 
+    // Reset loading state when image source changes
+    // currentImage depends on showOriginals and selectedImage.
+    // We can use an effect to force loading state to true when these change
+    const images = (showOriginals && ad?.imagenes_originales?.length > 0) ? ad.imagenes_originales : (ad?.imagenes || []);
+    const currentImage = images[selectedImage];
+
+    // Determine images to preload (the opposite set)
+    const imagesToPreload = (showOriginals)
+        ? (ad?.imagenes || [])
+        : (ad?.imagenes_originales || []);
+
+    useEffect(() => {
+        setIsMainImageLoading(true);
+    }, [currentImage]);
+
     // Helper to close modal and fix history
     const handleCloseModal = () => {
         setIsImageModalOpen(false);
@@ -473,8 +490,7 @@ export default function AdDetailPage({ params, initialAd }) {
         );
     }
 
-    const images = (showOriginals && ad.imagenes_originales?.length > 0) ? ad.imagenes_originales : (ad.imagenes || []);
-    const currentImage = images[selectedImage];
+
 
     // Dynamic Title
     let displayTitle = ad.titulo;
@@ -515,19 +531,34 @@ export default function AdDetailPage({ params, initialAd }) {
                             onClick={() => setIsImageModalOpen(true)}
                         >
                             {currentImage ? (
-                                <Image
-                                    src={currentImage}
-                                    alt={ad.titulo}
-                                    fill
-                                    className="object-cover"
-                                    priority
-                                    sizes="(max-width: 768px) 100vw, 50vw"
-                                />
+                                <>
+                                    <Image
+                                        src={currentImage}
+                                        alt={ad.titulo}
+                                        fill
+                                        className={`object-cover transition-opacity duration-300 ${isMainImageLoading ? 'opacity-80' : 'opacity-100'}`}
+                                        priority
+                                        sizes="(max-width: 768px) 100vw, 50vw"
+                                        onLoad={() => setIsMainImageLoading(false)}
+                                    />
+                                    {isMainImageLoading && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] z-10">
+                                            <Loader2 className="w-10 h-10 text-white animate-spin drop-shadow-lg" />
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-text-secondary">
                                     <Package size={64} className="opacity-30" />
                                 </div>
                             )}
+
+                            {/* Hidden Preloader for Background Images */}
+                            <div className="hidden" aria-hidden="true">
+                                {imagesToPreload.map((imgSrc, idx) => (
+                                    <img key={`preload-${idx}`} src={imgSrc} alt="" />
+                                ))}
+                            </div>
 
                             {/* Share & Favorite buttons */}
                             <div className="absolute top-4 right-4 flex gap-2">

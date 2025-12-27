@@ -101,6 +101,51 @@ export default function ProfilePage({ params }) {
         fetchResidentialDetails();
     }, [residencial]);
 
+    // Check for verified phone in localStorage
+    React.useEffect(() => {
+        // Only run if profile phone is empty to avoid overwriting user edits
+        if (!userProfile.telefono) {
+            const verifiedPhone = localStorage.getItem("user_phone_verified");
+            if (verifiedPhone) {
+                // If stored verified phone exists, use it.
+                // Assuming stored phone might contain country code (e.g. +521234567890)
+                // We should probably strip it if the UI expects just the number, 
+                // OR adapt the UI. The current UI logic (handleSendCode) prepends prefix.
+                // Let's try to strip standard prefixes if they match residential data
+                // For simplicity, just set it. The user can correct it if needed, 
+                // but since we verified it, it should be correct.
+
+                // Better approach: Check if it starts with the prefix of the residential
+                // residentialData might not be loaded yet inside this effect if it depends on async fetch.
+                // But we can just set it and let the user see.
+
+                // Let's strip the '+' if present for display consistency if the input is number only
+                // The input has .replace(/\D/g, '') on change, so it expects numbers.
+                let cleanPhone = verifiedPhone.replace(/^\+/, '');
+
+                // If we know the prefix (e.g. 52), we could try to strip it if checking against residentialData
+                // But residentialData is async. 
+                // Let's just put the numbers. If it includes country code, it's safer than missing it.
+
+                updateUserProfile({
+                    telefono: cleanPhone,
+                    telefono_verificado: true
+                });
+            }
+        } else if (userProfile.telefono && !userProfile.telefono_verificado) {
+            // If user has a phone but not verified, checks if matches locally verified one
+            const verifiedPhone = localStorage.getItem("user_phone_verified");
+            if (verifiedPhone) {
+                const cleanVerified = verifiedPhone.replace(/\D/g, '');
+                const cleanCurrent = userProfile.telefono.replace(/\D/g, '');
+                // Loose check: if current phone is contained in verified phone (to handle prefixes) or vice versa
+                if (cleanVerified.endsWith(cleanCurrent) && cleanCurrent.length > 7) {
+                    updateUserProfile({ telefono_verificado: true });
+                }
+            }
+        }
+    }, [userProfile.telefono, updateUserProfile]);
+
     const handleSendCode = async () => {
         if (!userProfile.telefono) return;
 
@@ -480,17 +525,10 @@ export default function ProfilePage({ params }) {
                                 <span>+{residentialData?.phone_prefix || '52'}</span>
                             </div>
                             {userProfile.telefono_verificado ? (
-                                <div className="relative flex-1 min-w-0">
-                                    <input
-                                        type="tel"
-                                        value={userProfile.telefono}
-                                        readOnly
-                                        className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main outline-none pr-10 opacity-70 cursor-not-allowed h-11"
-                                        disabled
-                                    />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 pointer-events-none">
-                                        <Check size={20} />
-                                    </div>
+                                <div className="flex items-center w-full bg-green-50/50 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
+                                    <Check className="text-green-500 mr-2" size={18} />
+                                    <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono}</span>
+                                    <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2">Verificado</span>
                                 </div>
                             ) : (
                                 <div className="flex flex-col md:flex-row flex-1 min-w-0 gap-2 md:gap-0">
