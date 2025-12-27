@@ -39,6 +39,12 @@ export default function ResidentialLayout({ children }) {
                 }
 
                 // 2. Background Geolocation Check (Silent)
+                // If verified by phone (WhatsApp), skip proximity check
+                if (accessRecord.method === 'phone') {
+                    console.log("Access granted via phone verification. Skipping perimeter check.");
+                    return;
+                }
+
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
