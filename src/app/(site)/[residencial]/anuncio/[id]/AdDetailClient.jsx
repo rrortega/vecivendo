@@ -5,7 +5,8 @@ import baas from "@/lib/baas";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { CommunityAlertBar } from "@/components/layout/CommunityAlertBar";
 import { Button } from "@/components/ui/Button";
-import { Loader2, AlertCircle, ArrowLeft, MessageCircle, Share2, ShoppingCart, Plus, Minus, User as UserIcon, Package, Heart, Home, Star, Gift, Eye, EyeOff, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, MessageCircle, Share2, ShoppingCart, Plus, Minus, User as UserIcon, Package, Heart, Home, Star, Gift, Eye, EyeOff, X, ChevronLeft, ChevronRight, Pencil, BarChart3 } from "lucide-react";
+import AdAnalytics from "@/components/console/ads/AdAnalytics";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -43,10 +44,14 @@ export default function AdDetailPage({ params, initialAd }) {
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     // New state for image loading indicator
     const [isMainImageLoading, setIsMainImageLoading] = useState(true);
+    const [mounted, setMounted] = useState(false);
+    const [isOwner, setIsOwner] = useState(false);
+    const [showMetricsModal, setShowMetricsModal] = useState(false);
     const variantRefs = useRef([]);
 
     // Scroll to selected variant on mobile
     useEffect(() => {
+        setMounted(true);
         if (selectedVariant && variants.length > 0) {
             const index = variants.findIndex(v => v.slug === selectedVariant.slug);
             if (index !== -1 && variantRefs.current[index]) {
@@ -316,6 +321,25 @@ export default function AdDetailPage({ params, initialAd }) {
 
     }, [adId, variant_slug]);
 
+    useEffect(() => {
+        if (ad && ad.celular_anunciante && mounted) {
+            const globalProfileData = localStorage.getItem('vecivendo_user_global');
+            if (globalProfileData) {
+                try {
+                    const userData = JSON.parse(globalProfileData);
+                    const userPhone = userData.telefono || "";
+                    // Normalize phone numbers for comparison
+                    const normalize = (p) => p.toString().replace(/\D/g, '').slice(-10);
+                    if (normalize(userPhone) === normalize(ad.celular_anunciante)) {
+                        setIsOwner(true);
+                    }
+                } catch (e) {
+                    console.error("Error parsing user data for ownership check:", e);
+                }
+            }
+        }
+    }, [ad, mounted]);
+
     // Handle Image Modal Closing (Esc & Back Button)
     useEffect(() => {
         if (isImageModalOpen) {
@@ -517,11 +541,35 @@ export default function AdDetailPage({ params, initialAd }) {
             <HomeHeader residencialName={residentialName} residentialSlug={residencialSlug} showSearch={false} showFilters={false} />
 
             <main className="max-w-7xl mx-auto px-4 pt-8 md:pt-20">
-                {/* Back Button */}
-                <Link href={`/${residencialSlug}`} className="inline-flex items-center text-text-secondary hover:text-primary mb-6 transition-colors">
-                    <ArrowLeft size={20} className="mr-2" />
-                    <span className="font-medium">Volver al catálogo</span>
-                </Link>
+                {/* Header Actions */}
+                <div className="flex flex-row items-center justify-between gap-4 mb-6">
+                    <Link href={`/${residencialSlug}`} className="inline-flex items-center text-text-secondary hover:text-primary transition-colors">
+                        <ArrowLeft size={20} className="mr-2" />
+                        <span className="font-medium hidden xs:inline">Volver al catálogo</span>
+                        <span className="font-medium xs:hidden">Volver</span>
+                    </Link>
+
+                    {isOwner && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowMetricsModal(true)}
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border border-border rounded-xl text-text-secondary hover:text-primary hover:border-primary transition-all shadow-sm group"
+                                title="Métricas"
+                            >
+                                <BarChart3 size={18} className="group-hover:scale-110 transition-transform" />
+                                <span className="font-semibold hidden sm:inline">Métricas</span>
+                            </button>
+                            <Link
+                                href={`/${residencialSlug}/anuncio/${adId}/editar`}
+                                className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-primary text-white rounded-xl hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                                title="Editar"
+                            >
+                                <Pencil size={18} />
+                                <span className="font-semibold hidden sm:inline">Editar</span>
+                            </Link>
+                        </div>
+                    )}
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                     {/* Image Gallery */}
@@ -727,18 +775,20 @@ export default function AdDetailPage({ params, initialAd }) {
                         )}
 
                         {/* Expiration Info */}
-                        <div className="flex items-center gap-2 text-sm text-text-secondary bg-surface border border-border px-3 py-2 rounded-lg w-fit">
-                            <Clock size={16} className={isExpired ? "text-red-500" : "text-primary"} />
-                            <span>
-                                {isExpired
-                                    ? "Este anuncio ha caducado"
-                                    : `Caduca en: ${daysRemaining}d ${hoursRemaining}h`
-                                }
-                            </span>
-                            <span className="text-xs text-gray-400 border-l border-border pl-2 ml-1">
-                                {updatedAt?.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                            </span>
-                        </div>
+                        {mounted && (
+                            <div className="flex items-center gap-2 text-sm text-text-secondary bg-surface border border-border px-3 py-2 rounded-lg w-fit">
+                                <Clock size={16} className={isExpired ? "text-red-500" : "text-primary"} />
+                                <span>
+                                    {isExpired
+                                        ? "Este anuncio ha caducado"
+                                        : `Caduca en: ${daysRemaining}d ${hoursRemaining}h`
+                                    }
+                                </span>
+                                <span className="text-xs text-gray-400 border-l border-border pl-2 ml-1">
+                                    {updatedAt?.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                                </span>
+                            </div>
+                        )}
 
                         {/* Description */}
                         <div className="bg-surface rounded-xl p-6 border border-border">
@@ -772,7 +822,7 @@ export default function AdDetailPage({ params, initialAd }) {
                                     <div className="flex items-center gap-1 text-sm text-text-secondary">
                                         {/* Fake ratings removed */}
                                         {/* Only show if we had real ratings, e.g. advertiserInfo.rating */}
-                                        {advertiserInfo && advertiserInfo.createdAt && (
+                                        {mounted && advertiserInfo && advertiserInfo.createdAt && (
                                             <span>Miembro desde {new Date(advertiserInfo.registrationDate).getFullYear()}</span>
                                         )}
                                         {!advertiserInfo && (
@@ -976,6 +1026,32 @@ export default function AdDetailPage({ params, initialAd }) {
                                 </div>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+            {/* Metrics Modal */}
+            {showMetricsModal && isOwner && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowMetricsModal(false)}
+                    />
+                    <div className="relative bg-surface w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                        <div className="p-4 border-b border-border flex items-center justify-between bg-surface sticky top-0 z-10">
+                            <h2 className="text-xl font-bold text-text-main flex items-center gap-2">
+                                <BarChart3 className="text-primary" />
+                                Analítica del Anuncio
+                            </h2>
+                            <button
+                                onClick={() => setShowMetricsModal(false)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+                            <AdAnalytics ad={ad} />
+                        </div>
                     </div>
                 </div>
             )}

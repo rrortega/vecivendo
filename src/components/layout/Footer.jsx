@@ -14,6 +14,7 @@ export const Footer = () => {
         telefono_asistencia: "+52 55 1234 5678",
         email_contacto: "contacto@vecivendo.com"
     });
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -45,6 +46,7 @@ export const Footer = () => {
         };
 
         fetchConfig();
+        setMounted(true);
     }, []);
 
     return (
@@ -157,7 +159,7 @@ export const Footer = () => {
                         <span>para tu comunidad</span>
                     </div>
                     <div>
-                        © {new Date().getFullYear()} Todos los derechos reservados.
+                        © {mounted ? new Date().getFullYear() : '2025'} Todos los derechos reservados.
                     </div>
                 </div>
             </div>

@@ -139,14 +139,14 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
         setVerificationStatus('searching');
 
         try {
-            const storedPhone = localStorage.getItem("user_phone_verified");
+            const globalProfileData = JSON.parse(localStorage.getItem("vecivendo_user_global") ?? '{}');
 
-            if (storedPhone) {
+            if (globalProfileData && globalProfileData?.telefono_verificado) {
                 const response = await fetch('/api/verify-phone', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        phone: storedPhone,
+                        phone: globalProfileData.telefono,
                         residential_id: residential.$id,
                         only_whatsapp: true
                     })
@@ -254,7 +254,7 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
             const data = await response.json();
 
             if (response.ok) {
-                localStorage.setItem("user_phone_verified", fullPhone);
+                localStorage.setItem("vecivendo_user_global", JSON.stringify({ "nombre": "", "telefono": fullPhone, "telefono_verificado": true, "photo": null }));
                 setStep("success");
                 saveAccess(residential.id);
             } else {

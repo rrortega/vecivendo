@@ -21,8 +21,12 @@ export default function ProfilePage({ params }) {
     const { residencial } = params;
     const [residentialName, setResidentialName] = React.useState(residencial);
     const [residentialData, setResidentialData] = React.useState(null);
-    const { userProfile, updateUserProfile, saveUserProfile, isDirty } = useUserProfile();
+    const { userProfile, updateUserProfile, saveUserProfile, isDirty } = useUserProfile(residencial);
     const { theme, toggleTheme } = useTheme();
+
+    // Track which section has changes
+    const [hasGlobalChanges, setHasGlobalChanges] = React.useState(false);
+    const [hasResidentialChanges, setHasResidentialChanges] = React.useState(false);
 
     // Verification State
     const [isVerifying, setIsVerifying] = React.useState(false);
@@ -146,6 +150,27 @@ export default function ProfilePage({ params }) {
         }
     }, [userProfile.telefono, updateUserProfile]);
 
+    // Wrapper function to track which section has changes
+    const handleUpdateProfile = (updates) => {
+        const globalFields = ['nombre', 'telefono', 'telefono_verificado', 'userId', 'photo'];
+        const residentialFields = ['calle', 'manzana', 'lote', 'casa', 'ubicacion', 'lat', 'lng'];
+
+        const hasGlobal = Object.keys(updates).some(key => globalFields.includes(key));
+        const hasResidential = Object.keys(updates).some(key => residentialFields.includes(key));
+
+        if (hasGlobal) setHasGlobalChanges(true);
+        if (hasResidential) setHasResidentialChanges(true);
+
+        updateUserProfile(updates);
+    };
+
+    // Custom save function that resets flags
+    const handleSaveProfile = () => {
+        saveUserProfile();
+        setHasGlobalChanges(false);
+        setHasResidentialChanges(false);
+    };
+
     const handleSendCode = async () => {
         if (!userProfile.telefono) return;
 
@@ -159,13 +184,15 @@ export default function ProfilePage({ params }) {
         setVerificationError('');
 
         try {
-            const fullPhone = `${residentialData?.phone_prefix || '52'}${userProfile.telefono}`;
+            // If phone already has country code, use it; otherwise add prefix
+            const phoneNumber = userProfile.telefono.replace(/\D/g, '');
+            const fullPhone = phoneNumber.length > 10 ? phoneNumber : `${residentialData?.phone_prefix || '52'}${phoneNumber}`;
             const response = await fetch('/api/verify-phone', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     phone: fullPhone,
-                    residencial_id: residencialId,
+                    residential_id: residencialId,
                     action: 'code',
                     name: userProfile.nombre,
                     address: {
@@ -203,13 +230,15 @@ export default function ProfilePage({ params }) {
         setVerificationError('');
 
         try {
-            const fullPhone = `${residentialData?.phone_prefix || '52'}${userProfile.telefono}`;
+            // If phone already has country code, use it; otherwise add prefix
+            const phoneNumber = userProfile.telefono.replace(/\D/g, '');
+            const fullPhone = phoneNumber.length > 10 ? phoneNumber : `${residentialData?.phone_prefix || '52'}${phoneNumber}`;
             const response = await fetch('/api/verify-phone', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     phone: fullPhone,
-                    residencial_id: residencialId,
+                    residential_id: residencialId,
                     action: 'verify',
                     code: code
                 })
@@ -218,16 +247,16 @@ export default function ProfilePage({ params }) {
             const data = await response.json();
 
             if (response.ok) {
-                // Save userId from response
+                // Save userId from response and full phone with country code
                 const updates = {
+                    telefono: fullPhone, // Save with country code
                     telefono_verificado: true,
                     userId: data.userId // Assuming the API returns userId
                 };
                 updateUserProfile(updates);
 
                 // Force save
-                const updatedProfile = { ...userProfile, ...updates };
-                localStorage.setItem('vecivendo_user_profile', JSON.stringify(updatedProfile));
+                saveUserProfile();
 
                 setShowOtpModal(false);
                 setOtp(['', '', '', '', '', '']);
@@ -408,7 +437,7 @@ export default function ProfilePage({ params }) {
                 </nav>
             </aside>
 
-            <div className="max-w-2xl mx-auto pt-20 md:pt-20 px-4 md:px-6">
+            <div className="max-w-2xl mx-auto pt-10 md:pt-20 px-4 md:px-6">
                 {/* Residential Cover */}
                 {residentialData?.portada && (
                     <div className="w-full h-48 md:h-64 rounded-2xl overflow-hidden mb-6 shadow-sm border border-border relative group">
@@ -484,13 +513,13 @@ export default function ProfilePage({ params }) {
                     </div>
                 </div>
 
-                {/* Profile Form */}
+                {/* Datos Personales Section */}
                 <div className="bg-surface rounded-2xl p-6 mb-6 border border-gray-200 relative">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-text-main">Mis Datos</h2>
-                        {isDirty && (
+                        <h2 className="text-lg font-bold text-text-main">Mis Datos Personales</h2>
+                        {hasGlobalChanges && isDirty && (
                             <button
-                                onClick={saveUserProfile}
+                                onClick={handleSaveProfile}
                                 className="bg-primary text-white p-2 rounded-lg shadow-lg transition-all duration-200 animate-in fade-in zoom-in border border-transparent hover:border-white"
                                 title="Guardar cambios"
                             >
@@ -499,13 +528,16 @@ export default function ProfilePage({ params }) {
                         )}
                     </div>
                     <div className="space-y-4">
-                        <input
-                            type="text"
-                            value={userProfile.nombre}
-                            onChange={(e) => updateUserProfile({ nombre: e.target.value })}
-                            className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-11 mb-2"
-                            placeholder="Tu nombre completo"
-                        />
+                        <div>
+                            <label className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
+                            <input
+                                type="text"
+                                value={userProfile.nombre}
+                                onChange={(e) => handleUpdateProfile({ nombre: e.target.value })}
+                                className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-11"
+                                placeholder="Tu nombre completo"
+                            />
+                        </div>
                     </div>
 
                     {/* Phone Input */}
@@ -527,27 +559,27 @@ export default function ProfilePage({ params }) {
                             {userProfile.telefono_verificado ? (
                                 <div className="flex items-center w-full bg-green-50/50 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
                                     <Check className="text-green-500 mr-2" size={18} />
-                                    <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono}</span>
+                                    <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || userProfile.telefono}</span>
                                     <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2">Verificado</span>
                                 </div>
                             ) : (
                                 <div className="flex flex-col md:flex-row flex-1 min-w-0 gap-2 md:gap-0">
                                     <input
                                         type="tel"
-                                        value={userProfile.telefono}
+                                        value={userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || ''}
                                         onChange={(e) => {
                                             const val = e.target.value.replace(/\D/g, '');
-                                            updateUserProfile({ telefono: val, telefono_verificado: false });
+                                            handleUpdateProfile({ telefono: val, telefono_verificado: false });
                                         }}
-                                        className={`flex-1 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none ${userProfile.telefono?.length >= 9 ? 'rounded-r-lg md:rounded-r-none md:border-r-0' : ''} min-w-0`}
+                                        className={`flex-1 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none ${(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 ? 'rounded-r-lg  ' : ''} min-w-0`}
                                         placeholder="Número celular"
                                     />
-                                    {userProfile.telefono?.length >= 9 && (
+                                    {(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 && (
                                         <Button
-                                            variant="ghost"
+                                            variant="outline"
                                             onClick={handleSendCode}
                                             disabled={!userProfile.telefono || isVerifying}
-                                            className="w-full md:w-12 flex items-center justify-center py-2 transition-colors border border-gray-300 rounded-lg md:rounded-r-lg md:rounded-l-none bg-surface md:border-l-transparent hover:border-primary"
+                                            className="w-full md:w-12 flex items-center justify-center transition-colors border border-primary/30 rounded-lg md:rounded-lg ml-2 bg-surface hover:border-primary min-w-[70px] max-h-[42px]  py-0"
                                             title="Verificar número"
                                         >
                                             {isVerifying ? (
@@ -574,13 +606,29 @@ export default function ProfilePage({ params }) {
                             <p className="text-red-500 text-xs mt-1 text-right">{verificationError}</p>
                         )}
                     </div>
+                </div>
+
+                {/* Dirección en Residencial Section */}
+                <div className="bg-surface rounded-2xl p-6 mb-6 border border-gray-200 relative">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-bold text-text-main">Mi Dirección en {residentialName}</h2>
+                        {hasResidentialChanges && isDirty && (
+                            <button
+                                onClick={handleSaveProfile}
+                                className="bg-primary text-white p-2 rounded-lg shadow-lg transition-all duration-200 animate-in fade-in zoom-in border border-transparent hover:border-white"
+                                title="Guardar cambios"
+                            >
+                                <Save size={20} />
+                            </button>
+                        )}
+                    </div>
 
                     <div>
                         <label className="block mt-3 text-sm font-medium text-text-secondary mb-1">Calle</label>
                         <input
                             type="text"
                             value={userProfile.calle}
-                            onChange={(e) => updateUserProfile({ calle: e.target.value })}
+                            onChange={(e) => handleUpdateProfile({ calle: e.target.value })}
                             className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-11 mb-2"
                             placeholder="Ej. Av. Principal"
                         />
@@ -591,7 +639,7 @@ export default function ProfilePage({ params }) {
                             <input
                                 type="text"
                                 value={userProfile.manzana}
-                                onChange={(e) => updateUserProfile({ manzana: e.target.value })}
+                                onChange={(e) => handleUpdateProfile({ manzana: e.target.value })}
                                 className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-11 mb-2"
                                 placeholder="Ej. A"
                             />
@@ -601,7 +649,7 @@ export default function ProfilePage({ params }) {
                             <input
                                 type="text"
                                 value={userProfile.lote}
-                                onChange={(e) => updateUserProfile({ lote: e.target.value })}
+                                onChange={(e) => handleUpdateProfile({ lote: e.target.value })}
                                 className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-11 mb-2"
                                 placeholder="Ej. 12"
                             />
@@ -611,7 +659,7 @@ export default function ProfilePage({ params }) {
                             <input
                                 type="text"
                                 value={userProfile.casa}
-                                onChange={(e) => updateUserProfile({ casa: e.target.value })}
+                                onChange={(e) => handleUpdateProfile({ casa: e.target.value })}
                                 className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-11 mb-2"
                                 placeholder="Ej. 4B"
                             />
@@ -622,7 +670,7 @@ export default function ProfilePage({ params }) {
                             <LocationPicker
                                 initialLat={userProfile.lat}
                                 initialLng={userProfile.lng}
-                                onLocationSelect={(lat, lng) => updateUserProfile({ lat, lng })}
+                                onLocationSelect={(lat, lng) => handleUpdateProfile({ lat, lng })}
                                 residentialName={residentialName}
                                 residentialCenter={residentialData?.center}
                                 residentialRadius={residentialData?.radius}
@@ -635,7 +683,7 @@ export default function ProfilePage({ params }) {
                             <label className="block text-sm font-medium text-text-secondary mb-1">Descripción de Ubicación</label>
                             <textarea
                                 value={userProfile.ubicacion}
-                                onChange={(e) => updateUserProfile({ ubicacion: e.target.value })}
+                                onChange={(e) => handleUpdateProfile({ ubicacion: e.target.value })}
                                 className="w-full bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none h-20 resize-none mb-2"
                                 placeholder="Ej. Casa blanca con portón negro..."
                             />

@@ -154,7 +154,7 @@ export default function HistoryPage({ params }) {
             <CommunityAlertBar residentialSlug={residencial} />
             <HomeHeader residencialName={residentialName} residentialSlug={residencial} showFilters={false} />
 
-            <div className="max-w-7xl mx-auto pt-20 md:pt-20 px-4 md:px-6">
+            <div className="max-w-7xl mx-auto pt-10 md:pt-20 px-4 md:px-6">
                 <div className="flex items-center gap-3 mb-8">
                     <Clock className="text-primary" size={32} />
                     <h1 className="text-3xl font-bold text-text-main">Historial de Pedidos</h1>

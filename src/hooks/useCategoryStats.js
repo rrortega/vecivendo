@@ -57,34 +57,27 @@ export const useCategoryStats = (residentialId) => {
                 const now = new Date();
 
                 activeAds.forEach(ad => {
-                    // Use $updatedAt if available, otherwise default to now (assume valid if server returned it)
-                    const updatedAt = ad.$updatedAt ? new Date(ad.$updatedAt) : new Date();
-                    const daysValid = ad.dias_vigencia || 30;
-                    const expirationDate = new Date(updatedAt.getTime() + daysValid * 24 * 60 * 60 * 1000);
+                    let catSlug = ad.categoria_slug;
 
-                    if (expirationDate > now) {
-                        let catSlug = ad.categoria_slug;
-
-                        // If no slug on ad, try to match by name from fetched categories
-                        if (!catSlug && ad.categoria) {
-                            const normalizedAdCat = ad.categoria.toLowerCase().trim();
-                            const match = categoriesResponse.documents.find(c =>
-                                c.nombre.toLowerCase() === normalizedAdCat ||
-                                c.slug === normalizedAdCat
-                            );
-                            if (match) {
-                                catSlug = match.slug;
-                            } else {
-                                // Fallback: basic normalization
-                                catSlug = normalizedAdCat.replace(/\s+/g, '-');
-                            }
+                    // If no slug on ad, try to match by name from fetched categories
+                    if (!catSlug && ad.categoria) {
+                        const normalizedAdCat = ad.categoria.toLowerCase().trim();
+                        const match = categoriesResponse.documents.find(c =>
+                            c.nombre.toLowerCase() === normalizedAdCat ||
+                            c.slug === normalizedAdCat
+                        );
+                        if (match) {
+                            catSlug = match.slug;
+                        } else {
+                            // Fallback: basic normalization
+                            catSlug = normalizedAdCat.replace(/\s+/g, '-');
                         }
+                    }
 
-                        if (catSlug) {
-                            // Normalize to lowercase for consistency
-                            catSlug = catSlug.toLowerCase();
-                            categoryCounts[catSlug] = (categoryCounts[catSlug] || 0) + 1;
-                        }
+                    if (catSlug) {
+                        // Normalize to lowercase for consistency
+                        catSlug = catSlug.toLowerCase();
+                        categoryCounts[catSlug] = (categoryCounts[catSlug] || 0) + 1;
                     }
                 });
 

@@ -297,9 +297,8 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 product.titulo?.toLowerCase().includes(searchQuery) ||
                 product.descripcion?.toLowerCase().includes(searchQuery);
 
-            const matchesCategory = !categoryFilter || product.categoria_slug === categoryFilter.toLowerCase();
-
-            return matchesSearch && matchesCategory;
+            // Category filtering is now handled by the API, no need to filter again here
+            return matchesSearch;
         })
         .sort((a, b) => {
             if (sortOption === "price_asc") {
@@ -338,7 +337,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                 <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center mb-4 text-text-secondary">
                     <Search size={32} />
                 </div>
-                <h3 className="text-lg font-bold text-text-main mb-2">No se encontraron productos</h3>
+                <h3 className="text-lg font-bold text-text-main mb-2">No se encontraron anuncios</h3>
                 <p className="text-text-secondary max-w-xs mx-auto">
                     Intenta ajustar tu búsqueda o filtros para encontrar lo que necesitas.
                 </p>

@@ -6,10 +6,9 @@ import { BottomNav } from "@/components/ui/BottomNav";
 import { CommunityAlertBar } from "@/components/layout/CommunityAlertBar";
 import { useResidential } from "@/hooks/useResidential";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { ShoppingBag, Plus, X, ExternalLink } from "lucide-react";
+import { ShoppingBag, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { client } from "@/lib/appwrite";
-import { Databases, Query } from "appwrite";
+import AdAnalytics from "@/components/console/ads/AdAnalytics";
 
 export default function MisAnunciosPage({ params }) {
     const { residencial } = params;
@@ -21,32 +20,126 @@ export default function MisAnunciosPage({ params }) {
     const [anuncios, setAnuncios] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [phoneVerified, setPhoneVerified] = useState(false);
+    const isVerifyingRef = React.useRef(false);
+    const hasFetchedRef = React.useRef(false);
 
     useEffect(() => {
-        if (userProfile?.telefono) {
-            fetchAnuncios();
-        } else if (userProfile && !userProfile.telefono) {
-            setIsLoading(false);
+        // Verificar si el teléfono está verificado en localStorage
+        const globalProfileData = localStorage.getItem('vecivendo_user_global');
+
+        if (globalProfileData) {
+            try {
+                const userData = JSON.parse(globalProfileData);
+
+                if (userData.telefono_verificado && userData.telefono && residentialData?.$id) {
+                    // Solo verificar si no estamos ya verificando
+                    if (!isVerifyingRef.current) {
+                        verifyPhoneWithAPI(userData.telefono, residentialData.$id);
+                    }
+                } else {
+                    // Si no está verificado en localStorage, marcar como no verificado
+                    setPhoneVerified(!!userData.telefono_verificado);
+                }
+            } catch (error) {
+                console.error('Error parsing vecivendo_user_global:', error);
+                setPhoneVerified(false);
+            }
+        } else {
+            setPhoneVerified(false);
         }
-    }, [userProfile]);
+    }, [residentialData?.$id]); // Solo depender del ID del residencial
+
+    const verifyPhoneWithAPI = async (phone, residentialId) => {
+        isVerifyingRef.current = true; // Set ref to true when verification starts
+        try {
+            const response = await fetch('/api/verify-phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: phone,
+                    residential_id: residentialId,
+                    only_whatsapp: true
+                })
+            });
+
+            if (response.ok) {
+                setPhoneVerified(true);
+            } else if (response.status === 404) {
+                // Si el endpoint no existe (404), confiar en localStorage
+                console.warn('API verify-phone not available, trusting localStorage');
+                setPhoneVerified(true);
+            } else {
+                // Solo limpiar si el API responde explícitamente que no está verificado (no 404)
+                const data = await response.json();
+                if (data.error && data.error.includes('no está registrado')) {
+                    // Actualizar vecivendo_user_global para marcar como no verificado
+                    const globalProfileData = localStorage.getItem('vecivendo_user_global');
+                    if (globalProfileData) {
+                        try {
+                            const userData = JSON.parse(globalProfileData);
+                            userData.telefono_verificado = false;
+                            localStorage.setItem('vecivendo_user_global', JSON.stringify(userData));
+                        } catch (e) {
+                            console.error('Error updating vecivendo_user_global:', e);
+                        }
+                    }
+                    setPhoneVerified(false);
+                } else {
+                    // Para otros errores, confiar en localStorage
+                    setPhoneVerified(true);
+                }
+            }
+        } catch (error) {
+            console.error('Error verifying phone:', error);
+            // En caso de error de red, confiar en localStorage
+            setPhoneVerified(true);
+        } finally {
+            isVerifyingRef.current = false;
+        }
+    };
+
+    useEffect(() => {
+        // Solo hacer fetch una vez cuando phoneVerified cambia a true
+        if (phoneVerified && userProfile?.telefono && !hasFetchedRef.current) {
+            hasFetchedRef.current = true;
+            fetchAnuncios();
+        } else if (!phoneVerified) {
+            setIsLoading(false);
+            hasFetchedRef.current = false; // Reset para permitir fetch cuando se verifique
+        }
+    }, [phoneVerified]); // Solo depender de phoneVerified
+
 
     const fetchAnuncios = async () => {
         setIsLoading(true);
         try {
-            const databases = new Databases(client);
-            const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+            // Obtener teléfono del perfil global
+            const globalProfileData = localStorage.getItem('vecivendo_user_global');
+            let phone = userProfile?.telefono;
 
-            // Fetch user's ads by phone number
-            if (userProfile.telefono) {
-                const response = await databases.listDocuments(dbId, "anuncios", [
-                    Query.equal("celular_anunciante", userProfile.telefono),
-                    Query.orderDesc("$updatedAt"),
-                    Query.limit(100)
-                ]);
-                setAnuncios(response.documents);
+            if (globalProfileData) {
+                try {
+                    const userData = JSON.parse(globalProfileData);
+                    phone = userData.telefono || phone;
+                } catch (e) {
+                    console.error('Error parsing vecivendo_user_global:', e);
+                }
+            }
+
+            if (phone) {
+                const response = await fetch(`/api/ads/user?phone=${encodeURIComponent(phone)}&residential=${encodeURIComponent(residencial)}`);
+
+                if (!response.ok) {
+                    throw new Error('Error fetching ads');
+                }
+
+                const data = await response.json();
+                setAnuncios(data.documents || []);
             }
         } catch (error) {
             console.error("Error fetching anuncios:", error);
+            setAnuncios([]);
         } finally {
             setIsLoading(false);
         }
@@ -74,9 +167,13 @@ export default function MisAnunciosPage({ params }) {
     return (
         <div className="min-h-screen bg-background pb-20 md:pb-0 transition-all duration-300" style={{ paddingTop: 'var(--alert-bar-height, 0px)' }}>
             <CommunityAlertBar residentialSlug={residencial} />
-            <HomeHeader residencialName={residentialName} residentialSlug={residencial} />
+            <HomeHeader
+                residencialName={residentialName}
+                residentialSlug={residencial}
+                showFilters={false}
+            />
 
-            <div className="max-w-7xl mx-auto pt-20 md:pt-20 px-4 md:px-6">
+            <div className="max-w-7xl mx-auto pt-10 md:pt-20 px-4 md:px-6">
                 <div className="flex items-center gap-3 mb-8">
                     <ShoppingBag className="text-primary" size={32} />
                     <h1 className="text-3xl font-bold text-text-main">Mis Anuncios</h1>
@@ -92,6 +189,22 @@ export default function MisAnunciosPage({ params }) {
                             </div>
                         ))}
                     </div>
+                ) : !phoneVerified ? (
+                    <div className="bg-surface rounded-xl border border-border p-8 text-center">
+                        <ShoppingBag className="mx-auto text-text-secondary/30 mb-4" size={64} />
+                        <h3 className="text-xl font-semibold text-text-main mb-2">
+                            Verifica tu número de teléfono
+                        </h3>
+                        <p className="text-text-secondary mb-6">
+                            Para poder ver y gestionar tus anuncios, primero debes verificar tu número de teléfono en tu perfil.
+                        </p>
+                        <button
+                            onClick={() => router.push(`/${residencial}/perfil`)}
+                            className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors inline-flex items-center gap-2"
+                        >
+                            Ir a Mi Perfil
+                        </button>
+                    </div>
                 ) : (
                     <>
                         {/* Anuncios List */}
@@ -100,52 +213,52 @@ export default function MisAnunciosPage({ params }) {
                                 {anuncios.map((anuncio) => (
                                     <div
                                         key={anuncio.$id}
-                                        className="bg-surface rounded-xl border border-border overflow-hidden hover:border-primary transition-colors"
+                                        className="bg-surface rounded-xl border border-border overflow-hidden hover:border-primary border-primary/50 shadow-lg transition-colors relative flex flex-col"
                                     >
-                                        <div className="relative h-48 bg-gray-200">
-                                            {anuncio.imagenes && anuncio.imagenes.length > 0 ? (
-                                                <img
-                                                    src={anuncio.imagenes[0]}
-                                                    alt={anuncio.titulo}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-text-secondary">
-                                                    Sin imagen
-                                                </div>
-                                            )}
-                                            {!anuncio.activo && (
-                                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                                    <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                                                        Desactivado
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="p-4">
-                                            <h3 className="font-semibold text-text-main mb-1 line-clamp-1">
-                                                {anuncio.titulo}
-                                            </h3>
-                                            <p className="text-sm text-text-secondary mb-3 line-clamp-2">
-                                                {anuncio.descripcion}
-                                            </p>
-                                            <div className="flex items-center justify-between">
-                                                <button
-                                                    onClick={() => router.push(`/${residencial}/anuncio/${anuncio.$id}`)}
-                                                    className="text-sm text-primary hover:underline"
-                                                >
-                                                    Ver detalles
-                                                </button>
-                                                <button
-                                                    onClick={() => handleToggleActive(anuncio.$id, anuncio.activo)}
-                                                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${anuncio.activo
-                                                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200"
-                                                        : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 hover:bg-gray-200"
-                                                        }`}
-                                                >
-                                                    {anuncio.activo ? "Activo" : "Inactivo"}
-                                                </button>
+                                        <div
+                                            className="cursor-pointer flex-1"
+                                            onClick={() => router.push(`/${residencial}/anuncio/${anuncio.$id}`)}
+                                        >
+                                            <div className="relative h-48 bg-gray-200">
+                                                {anuncio.imagenes && anuncio.imagenes.length > 0 ? (
+                                                    <img
+                                                        src={anuncio.imagenes[0]}
+                                                        alt={anuncio.titulo}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-text-secondary">
+                                                        Sin imagen
+                                                    </div>
+                                                )}
+                                                {!anuncio.activo && (
+                                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                                        <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                                                            Desactivado
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
+                                            <div className="p-4 pb-0">
+                                                <h3 className="font-semibold text-text-main mb-1 line-clamp-1">
+                                                    {anuncio.titulo}
+                                                </h3>
+                                                <p className="text-sm text-text-secondary line-clamp-2">
+                                                    {anuncio.descripcion}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 pt-3 flex items-center justify-end border-t border-border/50 mt-3">
+                                            <button
+                                                onClick={() => handleToggleActive(anuncio.$id, anuncio.activo)}
+                                                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors  ${anuncio.activo
+                                                    ? "bg-green-100 text-green dark:bg-green-900/30 dark:text-green hover:bg-green-200"
+                                                    : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 hover:bg-gray-200 "
+                                                    }`}
+                                            >
+                                                {anuncio.activo ? "Activo" : "Inactivo"}
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -222,6 +335,7 @@ export default function MisAnunciosPage({ params }) {
                     </div>
                 </div>
             )}
+
 
             <BottomNav />
         </div>

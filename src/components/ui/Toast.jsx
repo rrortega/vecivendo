@@ -36,8 +36,8 @@ export const Toast = ({ message, type = "info", onClose, duration = 3000 }) => {
 
     return (
         <div
-            className={`fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border transition-all duration-300 transform ${isVisible ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
-                } ${bgColors[type] || bgColors.info} backdrop-blur-md`}
+            className={`relative z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border backdrop-blur-md ${isVisible ? "animate-toast-in" : "animate-toast-out"
+                } ${bgColors[type] || bgColors.info}`}
         >
             {icons[type] || icons.info}
             <p className={`text-sm font-medium ${textColors[type] || textColors.info}`}>{message}</p>

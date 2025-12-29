@@ -96,11 +96,12 @@ export default function EditContentPage() {
         try {
             setSaving(true);
 
-            await databases.updateDocument(
-                DATABASE_ID,
-                COLLECTION_ID,
-                contentId,
-                {
+            const response = await fetch(`/api/contents/${contentId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
                     titulo: formData.titulo.trim(),
                     descripcion: formData.descripcion.trim(),
                     contenido_largo: formData.contenido_largo.trim(),
@@ -109,8 +110,13 @@ export default function EditContentPage() {
                     tipo_contenido: formData.tipo_contenido,
                     category: formData.category.trim(),
                     active: formData.active,
-                }
-            );
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error al actualizar el contenido');
+            }
 
             router.push("/console/contents");
         } catch (err) {
@@ -127,11 +133,20 @@ export default function EditContentPage() {
     const handleDelete = async () => {
         try {
             setDeleting(true);
-            await databases.deleteDocument(DATABASE_ID, COLLECTION_ID, contentId);
+
+            const response = await fetch(`/api/contents/${contentId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error al eliminar el contenido');
+            }
+
             router.push("/console/contents");
         } catch (err) {
             console.error("Error deleting content:", err);
-            setError("Error al eliminar el contenido");
+            setError(err.message || "Error al eliminar el contenido");
             setDeleting(false);
         }
     };

@@ -38,6 +38,7 @@ export async function GET(request) {
         // Build queries
         const queries = [
             Query.equal('residencial', residentialId),
+            Query.equal('activo', true),
             // Filter ads older than 7 days
             Query.greaterThanEqual('last_capture', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
         ];
@@ -62,7 +63,32 @@ export async function GET(request) {
 
         // Category filter
         if (category) {
-            queries.push(Query.equal('categoria_slug', category.toLowerCase()));
+            const catLower = category.toLowerCase();
+
+            // Try to find the real category name to be more robust with the 'categoria' field
+            let catNameForQuery = catLower.charAt(0).toUpperCase() + catLower.slice(1).replace(/-/g, ' ');
+
+            try {
+                const catCollectionId = 'categorias';
+                const catDocs = await databases.listDocuments(dbId, catCollectionId, [
+                    Query.equal('slug', catLower),
+                    Query.limit(1)
+                ]);
+
+                if (catDocs.documents.length > 0) {
+                    catNameForQuery = catDocs.documents[0].nombre;
+                }
+            } catch (catError) {
+                console.warn('[API /api/ads/list] Could not resolve category name from slug:', catError.message);
+            }
+
+            const fallbackName = catLower.charAt(0).toUpperCase() + catLower.slice(1).replace(/-/g, ' ');
+
+            queries.push(Query.or([
+                Query.equal('categoria_slug', catLower),
+                Query.equal('categoria', catNameForQuery),
+                Query.equal('categoria', fallbackName)
+            ]));
         }
 
         // Search filter
