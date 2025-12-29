@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { databases } from '@/lib/appwrite';
 import { Query } from 'appwrite';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { ChevronLeft } from 'lucide-react';
 import HelpHeader from '@/components/help/HelpHeader';

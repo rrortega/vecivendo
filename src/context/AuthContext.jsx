@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { account } from "@/lib/appwrite";
+import { AuthService } from "@/lib/auth-service";
 import { useRouter } from "next/navigation";
 
 const AuthContext = createContext();
@@ -39,6 +40,7 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await account.deleteSession("current");
+            AuthService.clearJWT(); // Clear cached token
             setUser(null);
             router.push("/console/login");
         } catch (error) {

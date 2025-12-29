@@ -11,22 +11,44 @@ export async function PATCH(request, { params }) {
         const { id } = params;
         const body = await request.json();
 
-        // Get session from cookies
+        // Get session from cookies or Authorization header
         const cookieStore = cookies();
-        const session = cookieStore.get('session');
+        const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
+        const allCookies = cookieStore.getAll();
+        const sessionCookie = allCookies.find(c =>
+            c.name === `a_session_${projectId}` ||
+            c.name === `a_session_${projectId}_legacy` ||
+            c.name === 'session'
+        );
 
-        if (!session) {
+        let sessionToken = sessionCookie?.value;
+        let isJWT = false;
+
+        // Fallback to Authorization header (JWT)
+        const authHeader = request.headers.get('Authorization');
+        if (!sessionToken && authHeader && authHeader.startsWith('Bearer ')) {
+            sessionToken = authHeader.split(' ')[1];
+            isJWT = true;
+        }
+
+        if (!sessionToken) {
             return NextResponse.json(
-                { error: 'No autenticado' },
+                { error: 'No autenticado. Sesión no encontrada.' },
                 { status: 401 }
             );
         }
 
-        // Create client with session
+        // Create client to verify admin
         const client = new Client()
             .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
-            .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID)
-            .setSession(session.value);
+            .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+
+        // Crucial: Use correct method depending on token type
+        if (isJWT) {
+            client.setJWT(sessionToken);
+        } else {
+            client.setSession(sessionToken);
+        }
 
         const account = new Account(client);
 
@@ -65,22 +87,44 @@ export async function DELETE(request, { params }) {
     try {
         const { id } = params;
 
-        // Get session from cookies
+        // Get session from cookies or Authorization header
         const cookieStore = cookies();
-        const session = cookieStore.get('session');
+        const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
+        const allCookies = cookieStore.getAll();
+        const sessionCookie = allCookies.find(c =>
+            c.name === `a_session_${projectId}` ||
+            c.name === `a_session_${projectId}_legacy` ||
+            c.name === 'session'
+        );
 
-        if (!session) {
+        let sessionToken = sessionCookie?.value;
+        let isJWT = false;
+
+        // Fallback to Authorization header (JWT)
+        const authHeader = request.headers.get('Authorization');
+        if (!sessionToken && authHeader && authHeader.startsWith('Bearer ')) {
+            sessionToken = authHeader.split(' ')[1];
+            isJWT = true;
+        }
+
+        if (!sessionToken) {
             return NextResponse.json(
-                { error: 'No autenticado' },
+                { error: 'No autenticado. Sesión no encontrada.' },
                 { status: 401 }
             );
         }
 
-        // Create client with session
+        // Create client to verify admin
         const client = new Client()
             .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT)
-            .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID)
-            .setSession(session.value);
+            .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+
+        // Crucial: Use correct method depending on token type
+        if (isJWT) {
+            client.setJWT(sessionToken);
+        } else {
+            client.setSession(sessionToken);
+        }
 
         const account = new Account(client);
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { databases } from "@/lib/appwrite";
+import { AuthService } from "@/lib/auth-service";
 import { ID } from "appwrite";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
@@ -77,11 +78,16 @@ export default function CreateContentPage() {
         try {
             setSaving(true);
 
-            await databases.createDocument(
-                DATABASE_ID,
-                COLLECTION_ID,
-                ID.unique(),
-                {
+            // Get valid JWT from AuthService (handles caching)
+            const jwtToken = await AuthService.getJWT();
+
+            const response = await fetch('/api/contents', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${jwtToken}`,
+                },
+                body: JSON.stringify({
                     titulo: formData.titulo.trim(),
                     descripcion: formData.descripcion.trim(),
                     contenido_largo: formData.contenido_largo.trim(),
@@ -91,8 +97,13 @@ export default function CreateContentPage() {
                     category: formData.category.trim(),
                     slug: slug,
                     active: formData.active,
-                }
-            );
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error al crear el contenido');
+            }
 
             router.push("/console/contents");
         } catch (err) {

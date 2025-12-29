@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { databases } from "@/lib/appwrite";
+import { AuthService } from "@/lib/auth-service";
 import { ArrowLeft, Save, Trash2, AlertTriangle, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import ContentEditor from "@/components/console/ContentEditor";
@@ -96,10 +97,14 @@ export default function EditContentPage() {
         try {
             setSaving(true);
 
+            // Get valid JWT from AuthService (handles caching)
+            const jwtToken = await AuthService.getJWT();
+
             const response = await fetch(`/api/contents/${contentId}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${jwtToken}`,
                 },
                 body: JSON.stringify({
                     titulo: formData.titulo.trim(),
@@ -134,8 +139,14 @@ export default function EditContentPage() {
         try {
             setDeleting(true);
 
+            // Get valid JWT from AuthService (handles caching)
+            const jwtToken = await AuthService.getJWT();
+
             const response = await fetch(`/api/contents/${contentId}`, {
                 method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${jwtToken}`,
+                },
             });
 
             if (!response.ok) {
