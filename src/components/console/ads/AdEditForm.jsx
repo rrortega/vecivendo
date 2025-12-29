@@ -401,7 +401,7 @@ export default function AdEditForm({ ad, hideAdvertiserFields = false, onDeleteS
                                             onChange={handleChange}
                                             className="sr-only peer "
                                         />
-                                        <div className="w-11  h-6 bg-surface border peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-black peer-checked:after:bg-black after:content-[''] after:absolute after:top-[2px] after:left-[2px]   after:border-white after:bg-black/30 after:border-2 after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-primary-600 transition-all"></div>
+                                        <div className="w-11 bg-white  h-6 bg-surface border peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-black peer-checked:after:bg-black after:content-[''] after:absolute after:top-[2px] after:left-[2px]   after:border-white after:bg-black/30 after:border-2 after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-primary-600 transition-all"></div>
                                     </label>
                                 </div>
                             </div>

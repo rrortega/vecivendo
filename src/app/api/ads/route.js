@@ -50,10 +50,17 @@ async function verifyAuth(request) {
 export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
-        const residentialId = searchParams.get('residential');
+        const residentialId = searchParams.get('residential') || searchParams.get('residencial');
         const active = searchParams.get('active') !== 'false'; // Default to true if not specified
         const limitStr = searchParams.get('limit');
         const limit = limitStr ? parseInt(limitStr, 10) : 1000;
+        const pageStr = searchParams.get('page');
+        const page = pageStr ? parseInt(pageStr, 10) : 1;
+
+        // Filtros adicionales
+        const searchQuery = searchParams.get('search');
+        const categoria = searchParams.get('categoria');
+        const dateFilter = searchParams.get('date');
 
         const queries = [];
 
@@ -65,18 +72,38 @@ export async function GET(request) {
             queries.push(Query.equal("activo", true));
         }
 
-        // Filter ads updated in the last 7 days
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        queries.push(Query.greaterThanEqual("last_capture", sevenDaysAgo));
+        // Filtro por categoría
+        if (categoria) {
+            queries.push(Query.equal("categoria", categoria));
+        }
+
+        // Filtro por búsqueda en título
+        if (searchQuery) {
+            queries.push(Query.search("titulo", searchQuery));
+        }
+
+        // Filtro por fecha específica
+        if (dateFilter) {
+            const startOfDay = new Date(dateFilter);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(dateFilter);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            queries.push(Query.greaterThanEqual("$createdAt", startOfDay.toISOString()));
+            queries.push(Query.lessThanEqual("$createdAt", endOfDay.toISOString()));
+        } else {
+            // Filter ads updated in the last 7 days (solo si no hay filtro de fecha)
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            queries.push(Query.greaterThanEqual("last_capture", sevenDaysAgo));
+        }
 
         const sort = searchParams.get('sort') || '$createdAt';
         const order = searchParams.get('order') || 'desc';
 
-        const params = [
-            sort, order
-        ];
-
+        // Paginación
+        const offset = (page - 1) * limit;
         queries.push(Query.limit(limit));
+        queries.push(Query.offset(offset));
 
         // Dynamic Sorting
         if (order === 'asc') {
