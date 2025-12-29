@@ -9,10 +9,10 @@ export default function ArticleCard({ article }) {
                     <span className="inline-block px-3 py-1 mb-3 text-xs font-semibold tracking-wider text-primary uppercase bg-primary/10 rounded-full">
                         {article.category}
                     </span>
-                    <h3 className="text-xl font-bold  dark:text-white mb-3 group-hover:text-primary transition-colors">
+                    <h3 className="text-xl font-bold  text-forewround mb-3 group-hover:text-primary transition-colors">
                         {article.title}
                     </h3>
-                    <p className=" dark:text-white text-sm leading-relaxed line-clamp-3">
+                    <p className="text-sourface text-sm leading-relaxed line-clamp-3">
                         {article.excerpt}
                     </p>
                 </div>

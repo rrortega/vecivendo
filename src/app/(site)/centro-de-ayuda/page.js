@@ -98,10 +98,10 @@ function HelpCenterContent() {
             <main className="py-12 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-7xl mx-auto">
                     <div className="text-center mb-12">
-                        <h1 className="text-4xl font-extrabold  dark:text-white sm:text-5xl mb-4">
+                        <h1 className="text-4xl font-extrabold    sm:text-5xl mb-4">
                             Centro de Ayuda
                         </h1>
-                        <p className="text-xl   dark:text-white max-w-2xl mx-auto">
+                        <p className="text-xl    max-w-2xl mx-auto">
                             Encuentra respuestas, guías y consejos rápidos.
                         </p>
                     </div>
@@ -151,7 +151,7 @@ function HelpCenterContent() {
                                     </button>
 
                                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                        Página <span className="text-gray-900 dark:text-white font-bold">{currentPage}</span> de {totalPages}
+                                        Página <span className="text-gray-900  font-bold">{currentPage}</span> de {totalPages}
                                     </span>
 
                                     <button

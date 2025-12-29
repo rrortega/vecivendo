@@ -6,7 +6,7 @@ import { BottomNav } from "@/components/ui/BottomNav";
 import { CommunityAlertBar } from "@/components/layout/CommunityAlertBar";
 import { useResidential } from "@/hooks/useResidential";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { ShoppingBag, Plus, X } from "lucide-react";
+import { ShoppingBag, Plus, X, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdAnalytics from "@/components/console/ads/AdAnalytics";
 

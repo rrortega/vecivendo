@@ -16,7 +16,7 @@ export default function SupportChannels() {
                         <div className="p-3 bg-primary/10 rounded-full mb-4 group-hover:scale-110 transition-transform">
                             <Mail className="w-6 h-6 text-primary" />
                         </div>
-                        <h3 className="text-lg font-semibold  dark:text-white mb-2">
+                        <h3 className="text-lg font-semibold   mb-2">
                             Envíanos un correo
                         </h3>
                         <p className="text-gray-500 dark:text-gray-400 text-center text-sm">
@@ -36,7 +36,7 @@ export default function SupportChannels() {
                         <div className="p-3 bg-primary/10 rounded-full mb-4 group-hover:scale-110 transition-transform">
                             <MessageCircle className="w-6 h-6 text-primary" />
                         </div>
-                        <h3 className="text-lg font-semibold  dark:text-white mb-2">
+                        <h3 className="text-lg font-semibold   mb-2">
                             Chat por WhatsApp
                         </h3>
                         <p className="text-gray-500 dark:text-gray-400 text-center text-sm">

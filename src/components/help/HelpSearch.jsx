@@ -22,7 +22,7 @@ export default function HelpSearch({ onSearch, initialValue = '' }) {
                 <input
                     type="text"
                     placeholder="¿En qué podemos ayudarte hoy?"
-                    className="w-full py-4 pl-12 pr-4 text-gray-900 dark:text-white bg-surface border border-gray-200 dark:border-gray-700 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    className="w-full py-4 pl-12 pr-4 text-foreground bg-surface border border-gray-200 dark:border-gray-700 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     value={query}
                     onChange={(e) => {
                         setQuery(e.target.value);

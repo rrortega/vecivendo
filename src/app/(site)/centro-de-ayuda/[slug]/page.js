@@ -74,7 +74,7 @@ export default function ArticlePage({ params }) {
                 <HelpHeader />
                 <div className="max-w-4xl mx-auto py-12 px-4 text-center">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Artículo no encontrado</h1>
-                    <Link href="/centro-de-ayuda" className="text-primary-600 dark:text-white hover:text-primary-700 font-medium">
+                    <Link href="/centro-de-ayuda" className="text-primary-600  hover:text-primary-700 font-medium">
                         Volver al Centro de Ayuda
                     </Link>
                 </div>
@@ -90,7 +90,7 @@ export default function ArticlePage({ params }) {
                 <div className="max-w-4xl mx-auto">
                     <Link
                         href="/centro-de-ayuda"
-                        className="inline-flex items-center text-sm font-medium text-gray-500 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 mb-8 transition-colors"
+                        className="inline-flex items-center text-sm font-medium text-gray-500  hover:text-primary-600 dark:hover:text-primary-400 mb-8 transition-colors"
                     >
                         <ChevronLeft className="w-4 h-4 mr-1" />
                         Volver al Centro de Ayuda
@@ -102,10 +102,10 @@ export default function ArticlePage({ params }) {
                                 <span className="inline-block px-3 py-1 mb-4 text-xs font-semibold tracking-wider text-primary uppercase bg-primary/10 rounded-full">
                                     {article.category}
                                 </span>
-                                <h1 className="text-3xl sm:text-4xl font-extrabold   dark:text-white mb-4">
+                                <h1 className="text-3xl sm:text-4xl font-extrabold     mb-4">
                                     {article.title}
                                 </h1>
-                                <p className="text-xl  dark:text-white leading-relaxed">
+                                <p className="text-xl  leading-relaxed">
                                     {article.excerpt}
                                 </p>
                             </div>

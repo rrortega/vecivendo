@@ -21,7 +21,7 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title, messag
                                 <AlertTriangle size={24} />
                             </div>
                             <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                <h3 className="text-lg font-semibold text-foreground  mb-2">
                                     {title}
                                 </h3>
                                 <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
