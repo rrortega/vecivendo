@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { users, ID, Query } from '@/lib/appwrite-server';
 
 // Rate limiting: Map para rastrear intentos por IP y teléfono
 const rateLimitMap = new Map();
@@ -48,7 +49,6 @@ export async function POST(request) {
         }
 
         // CASO 1: Solo verificar WhatsApp (sin OTP)
-        // Si solo queremos verificar WhatsApp, usar el endpoint de residencial
         if (only_whatsapp === true) {
             const residentialApiUrl = process.env.PHONE_RESIDENCIAL_API_URL;
 
@@ -79,6 +79,24 @@ export async function POST(request) {
                 }
 
                 const data = await checkResponse.json();
+
+                // --- INTEGRACIÓN APPWRITE AUTOMÁTICA ---
+                // Si la validación de WhatsApp fue exitosa, también generamos sesión si el usuario lo requiere
+                // (Aunque usualmente este caso es solo para checar acceso, si devuelve success podemos dar secret)
+                if (data.status === 'success') {
+                    try {
+                        let userId = phone.replace(/\+/g, '');
+                        if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+                            userId = '521' + userId.substring(2);
+                        }
+                        const token = await users.createToken(userId);
+                        data.appwriteSecret = token.secret;
+                        data.appwriteUserId = userId;
+                    } catch (e) {
+                        console.error("Error generating session secret for WhatsApp validation:", e.message);
+                    }
+                }
+
                 return NextResponse.json(data);
             } catch (checkError) {
                 console.error("Error de conexión validando residencial:", checkError);
@@ -87,7 +105,6 @@ export async function POST(request) {
         }
 
         // CASO 2: Flujo OTP (envío de SMS)
-        // Rate limiting solo para flujo OTP
         if (!checkRateLimit(ip, phone)) {
             return NextResponse.json(
                 { error: "Demasiados intentos. Por favor espera un minuto antes de intentar nuevamente." },
@@ -95,7 +112,6 @@ export async function POST(request) {
             );
         }
 
-        // Flujo OTP normal
         const apiUrl = process.env.PHONE_VERIFICATION_API_URL;
 
         if (!apiUrl) {
@@ -132,17 +148,8 @@ export async function POST(request) {
                             { status: 404 }
                         );
                     }
-
-                    if (!checkResponse.ok) {
-                        console.error("Error validando residencial:", await checkResponse.text());
-                        return NextResponse.json(
-                            { error: "Error al validar permisos de residencial." },
-                            { status: checkResponse.status }
-                        );
-                    }
                 } catch (checkError) {
                     console.error("Error de conexión validando residencial:", checkError);
-                    return NextResponse.json({ error: "Error de conexión validando residencial" }, { status: 500 });
                 }
             }
         }
@@ -159,6 +166,29 @@ export async function POST(request) {
 
         if (!response.ok) {
             return NextResponse.json({ error: data.error || "Error en el servicio de verificación" }, { status: response.status });
+        }
+
+        // --- INTEGRACIÓN APPWRITE AUTOMÁTICA ---
+        // Si la acción fue 'verify' y fue exitosa, generamos la sesión
+        if (action === 'verify' && data.status === 'success') {
+            try {
+                // Eliminar el signo + y manejar el prefijo 521 para IDs de Appwrite
+                let userId = phone.replace(/\+/g, '');
+
+                if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+                    userId = '521' + userId.substring(2);
+                }
+
+                // Generar token de sesión (secret) para que el frontend inicie sesión
+                const token = await users.createToken(userId);
+
+                data.appwriteSecret = token.secret;
+                data.appwriteUserId = userId;
+
+                console.log(`✅ Sesión Appwrite generada para ID: ${userId}`);
+            } catch (appwriteError) {
+                console.error("⚠️ Error generando sesión Appwrite (no fatal):", appwriteError.message);
+            }
         }
 
         return NextResponse.json(data);

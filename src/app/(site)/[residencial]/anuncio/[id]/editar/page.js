@@ -53,11 +53,43 @@ export default function EditAdPage({ params }) {
             const userData = JSON.parse(globalProfileData);
             const userPhone = userData.telefono;
             const isPhoneVerified = userData.telefono_verificado;
+            const appwriteSecret = userData.appwriteSecret;
+            const userId = userData.userId;
 
             // Si el teléfono no está verificado, redirigir
             if (!isPhoneVerified || !userPhone) {
                 router.push(`/${residencial}/mis-anuncios`);
                 return;
+            }
+
+            // Crear sesión de Appwrite con un token fresco
+            if (isPhoneVerified && userPhone) {
+                try {
+                    // Solicitar un nuevo token al backend
+                    const tokenResponse = await fetch('/api/auth/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone: userPhone })
+                    });
+
+                    if (tokenResponse.ok) {
+                        const tokenData = await tokenResponse.json();
+                        const { account } = await import('@/lib/appwrite');
+
+                        console.log("🔐 Creando sesión de Appwrite para edición...");
+                        await account.createSession(tokenData.userId, tokenData.secret);
+                        console.log("✅ Sesión de Appwrite creada correctamente");
+
+                        // Actualizar el secret en localStorage para futuras sesiones
+                        userData.appwriteSecret = tokenData.secret;
+                        userData.userId = tokenData.userId;
+                        localStorage.setItem('vecivendo_user_global', JSON.stringify(userData));
+                    } else {
+                        console.error("❌ Error obteniendo token de sesión");
+                    }
+                } catch (appError) {
+                    console.error("❌ Error al crear sesión de Appwrite:", appError);
+                }
             }
 
             // Cargar el anuncio

@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import { useTheme } from "@/context/ThemeContext";
 import { countries } from "@/data/countries";
 import { OtpInput } from "@/components/ui/OtpInput";
+import { account } from "@/lib/appwrite";
 
 // Dynamically import the Map component to avoid SSR issues
 const LeafletMap = dynamic(() => import("./LeafletMap"), {
@@ -255,6 +256,18 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
 
             if (response.ok) {
                 localStorage.setItem("vecivendo_user_global", JSON.stringify({ "nombre": "", "telefono": fullPhone, "telefono_verificado": true, "photo": null }));
+
+                // --- APPWRITE SESSION ---
+                if (data.appwriteSecret && data.appwriteUserId) {
+                    try {
+                        console.log("🔐 Creando sesión de Appwrite...");
+                        await account.createSession(data.appwriteUserId, data.appwriteSecret);
+                        console.log("✅ Sesión de Appwrite iniciada correctamente");
+                    } catch (appError) {
+                        console.error("❌ Error al crear sesión de Appwrite:", appError);
+                    }
+                }
+
                 setStep("success");
                 saveAccess(residential.id);
             } else {

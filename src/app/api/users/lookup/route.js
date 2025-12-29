@@ -25,6 +25,28 @@ export async function GET(request) {
 
         console.log(`🔍 [API] Looking up user with phone ending in: ${last10}`);
 
+        /*
+                const lockupApiUrl = process.env.PHONE_RESIDENCIAL_API_URL;
+        
+                try {
+                    const checkResponse = await fetch(lockupApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone })
+                    });
+        
+                    if (checkResponse.status === 404) {
+                        return NextResponse.json(
+                            { error: "Este número no está registrado en vecivendo." },
+                            { status: 404 }
+                        );
+                    }
+                } catch (checkError) {
+                    console.error("Error de conexión validando residencial:", checkError);
+                }
+        */
+
+
         // List users and filter manually since Appwrite Query.search on phone might be strict
         // Ideally we would use Query.equal('phone', ...) but formats vary (+52..., 52...)
         // For now, we'll fetch a batch and filter. 
@@ -41,7 +63,7 @@ export async function GET(request) {
         // This is a limitation of the current implementation.
 
         const response = await users.list([
-            Query.limit(100),
+            Query.limit(1024),
             Query.orderDesc('$createdAt')
         ]);
 

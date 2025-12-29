@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "@/context/ThemeContext";
 import dynamic from 'next/dynamic';
-import { client } from "@/lib/appwrite";
+import { client, account } from "@/lib/appwrite";
 
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
     ssr: false,
@@ -20,8 +20,17 @@ export default function ProfilePage({ params }) {
     const router = useRouter();
     const { residencial } = params;
     const [residentialName, setResidentialName] = React.useState(residencial);
-    const [residentialData, setResidentialData] = React.useState(null);
-    const { userProfile, updateUserProfile, saveUserProfile, isDirty } = useUserProfile(residencial);
+    const [residentialsMetadata, setResidentialsMetadata] = React.useState(null);
+    const {
+        userProfile,
+        globalData,
+        residentialData: userResidentialData,
+        setGlobalData,
+        setResidentialData: setUserResidentialData,
+        updateUserProfile,
+        saveUserProfile,
+        isDirty
+    } = useUserProfile(residencial);
     const { theme, toggleTheme } = useTheme();
 
     // Track which section has changes
@@ -79,7 +88,7 @@ export default function ProfilePage({ params }) {
                     const centerLng = doc.ubicacion_centro_lng || doc.longitud;
                     const radius = doc.radio_autorizado_metros || doc.radio;
 
-                    setResidentialData({
+                    setResidentialsMetadata({
                         center: centerLat && centerLng ? { lat: parseFloat(centerLat), lng: parseFloat(centerLng) } : null,
                         radius: parseFloat(radius) || 1000,
                         country: doc.country || 'MX',
@@ -90,7 +99,7 @@ export default function ProfilePage({ params }) {
                     // Fallback for demo if not in DB
                     console.log("Using fallback demo data");
                     setResidentialName("Residencial Demo");
-                    setResidentialData({
+                    setResidentialsMetadata({
                         center: { lat: 21.1619, lng: -86.8515 }, // Cancun center
                         radius: 500,
                         country: 'MX',
@@ -186,7 +195,7 @@ export default function ProfilePage({ params }) {
         try {
             // If phone already has country code, use it; otherwise add prefix
             const phoneNumber = userProfile.telefono.replace(/\D/g, '');
-            const fullPhone = phoneNumber.length > 10 ? phoneNumber : `${residentialData?.phone_prefix || '52'}${phoneNumber}`;
+            const fullPhone = phoneNumber.length > 10 ? phoneNumber : `${residentialsMetadata?.phone_prefix || '52'}${phoneNumber}`;
             const response = await fetch('/api/verify-phone', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -232,7 +241,7 @@ export default function ProfilePage({ params }) {
         try {
             // If phone already has country code, use it; otherwise add prefix
             const phoneNumber = userProfile.telefono.replace(/\D/g, '');
-            const fullPhone = phoneNumber.length > 10 ? phoneNumber : `${residentialData?.phone_prefix || '52'}${phoneNumber}`;
+            const fullPhone = phoneNumber.length > 10 ? phoneNumber : `${residentialsMetadata?.phone_prefix || '52'}${phoneNumber}`;
             const response = await fetch('/api/verify-phone', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -247,16 +256,31 @@ export default function ProfilePage({ params }) {
             const data = await response.json();
 
             if (response.ok) {
-                // Save userId from response and full phone with country code
-                const updates = {
-                    telefono: fullPhone, // Save with country code
+                // Prepare updates
+                const globalUpdates = {
+                    ...globalData, // Get current global data (needs to be available in scope)
+                    telefono: fullPhone,
                     telefono_verificado: true,
-                    userId: data.userId // Assuming the API returns userId
+                    userId: data.appwriteUserId || data.userId,
+                    appwriteSecret: data.appwriteSecret // Store the secret as well
                 };
-                updateUserProfile(updates);
 
-                // Force save
-                saveUserProfile();
+                // Update state
+                setGlobalData(globalUpdates);
+
+                // Save immediately to localStorage using the helper
+                saveUserProfile(globalUpdates);
+
+                // --- APPWRITE SESSION ---
+                if (data.appwriteSecret && data.appwriteUserId) {
+                    try {
+                        console.log("🔐 Creando sesión de Appwrite...");
+                        await account.createSession(data.appwriteUserId, data.appwriteSecret);
+                        console.log("✅ Sesión de Appwrite iniciada correctamente");
+                    } catch (appError) {
+                        console.error("❌ Error al crear sesión de Appwrite:", appError);
+                    }
+                }
 
                 setShowOtpModal(false);
                 setOtp(['', '', '', '', '', '']);
@@ -439,25 +463,26 @@ export default function ProfilePage({ params }) {
 
             <div className="max-w-2xl mx-auto pt-10 md:pt-20 px-4 md:px-6">
                 {/* Residential Cover */}
-                {residentialData?.portada && (
+                {residentialsMetadata?.portada && (
                     <div className="w-full h-48 md:h-64 rounded-2xl overflow-hidden mb-6 shadow-sm border border-border relative group">
                         <img
-                            src={residentialData.portada}
+                            src={residentialsMetadata.portada}
                             alt={`Portada ${residentialName}`}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                         <div className="absolute bottom-4 left-4 right-4 text-white">
                             <h2 className="text-2xl md:text-3xl font-bold drop-shadow-md">{residentialName}</h2>
-                            {residentialData.city && (
+                            {residentialsMetadata?.city && (
                                 <p className="text-white/90 text-sm flex items-center gap-1 mt-1">
                                     <MapPin size={14} />
-                                    {residentialData.city}
+                                    {residentialsMetadata?.city}
                                 </p>
                             )}
                         </div>
                     </div>
                 )}
+
                 {/* Profile Header */}
                 <div className="bg-surface rounded-2xl p-6 mb-6 border border-border">
                     <div className="flex items-center gap-4">
@@ -538,73 +563,73 @@ export default function ProfilePage({ params }) {
                                 placeholder="Tu nombre completo"
                             />
                         </div>
-                    </div>
 
-                    {/* Phone Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Celular</label>
-                        <div className="flex gap-2 items-start">
-                            <div className="flex items-center gap-2 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-secondary select-none shrink-0">
-                                {residentialData?.country ? (
-                                    <img
-                                        src={`https://flagcdn.com/${residentialData.country.toLowerCase()}.svg`}
-                                        alt={residentialData.country}
-                                        className="w-6 h-auto object-cover rounded-sm"
-                                    />
-                                ) : (
-                                    <span>🏳️</span>
-                                )}
-                                <span>+{residentialData?.phone_prefix || '52'}</span>
-                            </div>
-                            {userProfile.telefono_verificado ? (
-                                <div className="flex items-center w-full bg-green-50/50 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
-                                    <Check className="text-green-500 mr-2" size={18} />
-                                    <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || userProfile.telefono}</span>
-                                    <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2">Verificado</span>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col md:flex-row flex-1 min-w-0 gap-2 md:gap-0">
-                                    <input
-                                        type="tel"
-                                        value={userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || ''}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(/\D/g, '');
-                                            handleUpdateProfile({ telefono: val, telefono_verificado: false });
-                                        }}
-                                        className={`flex-1 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none ${(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 ? 'rounded-r-lg  ' : ''} min-w-0`}
-                                        placeholder="Número celular"
-                                    />
-                                    {(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 && (
-                                        <Button
-                                            variant="outline"
-                                            onClick={handleSendCode}
-                                            disabled={!userProfile.telefono || isVerifying}
-                                            className="w-full md:w-12 flex items-center justify-center transition-colors border border-primary/30 rounded-lg md:rounded-lg ml-2 bg-surface hover:border-primary min-w-[70px] max-h-[42px]  py-0"
-                                            title="Verificar número"
-                                        >
-                                            {isVerifying ? (
-                                                <Loader2 className="animate-spin text-primary" size={20} />
-                                            ) : (
-                                                <>
-                                                    <Check className="text-primary" size={20} />
-                                                    <span className="md:hidden ml-2 font-medium text-primary">Validar celular</span>
-                                                </>
-                                            )}
-                                        </Button>
+                        {/* Phone Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-text-secondary mb-1">Celular</label>
+                            <div className="flex gap-2 items-start">
+                                <div className="flex items-center gap-2 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-secondary select-none shrink-0">
+                                    {residentialsMetadata?.country ? (
+                                        <img
+                                            src={`https://flagcdn.com/${residentialsMetadata?.country?.toLowerCase()}.svg`}
+                                            alt={residentialsMetadata?.country}
+                                            className="w-5 h-4 object-cover rounded-sm shadow-sm opacity-80"
+                                        />
+                                    ) : (
+                                        <Megaphone className="w-5 h-5 text-primary" />
                                     )}
+                                    <span>+{residentialsMetadata?.phone_prefix || '52'}</span>
                                 </div>
+                                {userProfile.telefono_verificado ? (
+                                    <div className="flex items-center w-full bg-green-50/50 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
+                                        <Check className="text-green-500 mr-2" size={18} />
+                                        <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || userProfile.telefono}</span>
+                                        <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2">Verificado</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col md:flex-row flex-1 min-w-0 gap-2 md:gap-0">
+                                        <input
+                                            type="tel"
+                                            value={userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                handleUpdateProfile({ telefono: val, telefono_verificado: false });
+                                            }}
+                                            className={`flex-1 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none ${(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 ? 'rounded-r-lg' : ''} min-w-0`}
+                                            placeholder="Número celular"
+                                        />
+                                        {(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={handleSendCode}
+                                                disabled={!userProfile.telefono || isVerifying}
+                                                className="w-full md:w-12 flex items-center justify-center transition-colors border border-primary/30 rounded-lg md:rounded-lg ml-2 bg-surface hover:border-primary min-w-[70px] max-h-[42px] py-0"
+                                                title="Verificar número"
+                                            >
+                                                {isVerifying ? (
+                                                    <Loader2 className="animate-spin text-primary" size={20} />
+                                                ) : (
+                                                    <>
+                                                        <Check className="text-primary" size={20} />
+                                                        <span className="md:hidden ml-2 font-medium text-primary">Validar celular</span>
+                                                    </>
+                                                )}
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {userProfile.telefono_verificado && (
+                                <p className="text-green-600 text-xs mt-1">
+                                    Este celular ya está verificado en el residencial
+                                </p>
+                            )}
+
+                            {verificationError && !showOtpModal && (
+                                <p className="text-red-500 text-xs mt-1 text-right">{verificationError}</p>
                             )}
                         </div>
-
-                        {userProfile.telefono_verificado && (
-                            <p className="text-green-600 text-xs mt-1">
-                                Este celular ya está verificado en el residencial
-                            </p>
-                        )}
-
-                        {verificationError && !showOtpModal && (
-                            <p className="text-red-500 text-xs mt-1 text-right">{verificationError}</p>
-                        )}
                     </div>
                 </div>
 
@@ -672,8 +697,8 @@ export default function ProfilePage({ params }) {
                                 initialLng={userProfile.lng}
                                 onLocationSelect={(lat, lng) => handleUpdateProfile({ lat, lng })}
                                 residentialName={residentialName}
-                                residentialCenter={residentialData?.center}
-                                residentialRadius={residentialData?.radius}
+                                residentialCenter={residentialsMetadata?.center}
+                                residentialRadius={residentialsMetadata?.radius}
                             />
                         </div>
                     )}

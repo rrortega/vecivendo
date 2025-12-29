@@ -11,6 +11,7 @@ import {
     AlertTriangle,
 } from 'lucide-react';
 import { useToast } from "@/context/ToastContext";
+import { AuthService } from "@/lib/auth-service";
 import ImageUploader from './ImageUploader';
 import VariantsManager from './VariantsManager';
 import ConfirmModal from '../ConfirmModal';
@@ -114,17 +115,26 @@ export default function AdEditForm({ ad, hideAdvertiserFields = false, onDeleteS
 
             console.log('📤 Enviando datos del anuncio:', data);
 
+            // Get valid JWT from AuthService (handles caching)
+            const jwtToken = await AuthService.getJWT();
+
             let response;
             if (isEditing) {
                 response = await fetch(`/api/ads/${ad.$id}`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
                     body: JSON.stringify(data)
                 });
             } else {
                 response = await fetch('/api/ads', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
                     body: JSON.stringify(data)
                 });
             }
@@ -154,8 +164,14 @@ export default function AdEditForm({ ad, hideAdvertiserFields = false, onDeleteS
     const handleDelete = async () => {
         setLoading(true);
         try {
+            // Get valid JWT from AuthService (handles caching)
+            const jwtToken = await AuthService.getJWT();
+
             const response = await fetch(`/api/ads/${ad.$id}`, {
                 method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${jwtToken}`
+                }
             });
 
             if (!response.ok) throw new Error('Error al eliminar el anuncio');

@@ -98,13 +98,16 @@ export const useUserProfile = (residencialSlug = null) => {
         setIsDirty(true);
     };
 
-    const saveUserProfile = () => {
+    const saveUserProfile = (newGlobalData = null, newResidentialData = null) => {
+        const globalToSave = newGlobalData || globalData;
+        const residentialToSave = newResidentialData || residentialData;
+
         // Guardar datos globales
-        localStorage.setItem('vecivendo_user_global', JSON.stringify(globalData));
+        localStorage.setItem('vecivendo_user_global', JSON.stringify(globalToSave));
 
         // Guardar datos del residencial si tenemos un slug
         if (residencialSlug) {
-            localStorage.setItem(`vecivendo_user_residential_${residencialSlug}`, JSON.stringify(residentialData));
+            localStorage.setItem(`vecivendo_user_residential_${residencialSlug}`, JSON.stringify(residentialToSave));
         }
 
         setIsDirty(false);
@@ -112,6 +115,10 @@ export const useUserProfile = (residencialSlug = null) => {
 
     return {
         userProfile,
+        globalData,
+        residentialData,
+        setGlobalData,
+        setResidentialData,
         updateUserProfile,
         saveUserProfile,
         isDirty

@@ -9,6 +9,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { ShoppingBag, Plus, X, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdAnalytics from "@/components/console/ads/AdAnalytics";
+import { client, account, Databases } from "@/lib/appwrite";
 
 export default function MisAnunciosPage({ params }) {
     const { residencial } = params;
@@ -53,42 +54,38 @@ export default function MisAnunciosPage({ params }) {
     const verifyPhoneWithAPI = async (phone, residentialId) => {
         isVerifyingRef.current = true; // Set ref to true when verification starts
         try {
-            const response = await fetch('/api/verify-phone', {
+            // Solicitar un nuevo token de sesión
+            const tokenResponse = await fetch('/api/auth/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    phone: phone,
-                    residential_id: residentialId,
-                    only_whatsapp: true
-                })
+                body: JSON.stringify({ phone: phone })
             });
 
-            if (response.ok) {
-                setPhoneVerified(true);
-            } else if (response.status === 404) {
-                // Si el endpoint no existe (404), confiar en localStorage
-                console.warn('API verify-phone not available, trusting localStorage');
-                setPhoneVerified(true);
-            } else {
-                // Solo limpiar si el API responde explícitamente que no está verificado (no 404)
-                const data = await response.json();
-                if (data.error && data.error.includes('no está registrado')) {
-                    // Actualizar vecivendo_user_global para marcar como no verificado
+            if (tokenResponse.ok) {
+                const tokenData = await tokenResponse.json();
+
+                // --- APPWRITE SESSION ---
+                try {
+                    console.log("🔐 Creando sesión de Appwrite...");
+                    await account.createSession(tokenData.userId, tokenData.secret);
+                    console.log("✅ Sesión de Appwrite iniciada correctamente");
+
+                    // Actualizar el secret en localStorage
                     const globalProfileData = localStorage.getItem('vecivendo_user_global');
                     if (globalProfileData) {
-                        try {
-                            const userData = JSON.parse(globalProfileData);
-                            userData.telefono_verificado = false;
-                            localStorage.setItem('vecivendo_user_global', JSON.stringify(userData));
-                        } catch (e) {
-                            console.error('Error updating vecivendo_user_global:', e);
-                        }
+                        const userData = JSON.parse(globalProfileData);
+                        userData.appwriteSecret = tokenData.secret;
+                        userData.userId = tokenData.userId;
+                        localStorage.setItem('vecivendo_user_global', JSON.stringify(userData));
                     }
-                    setPhoneVerified(false);
-                } else {
-                    // Para otros errores, confiar en localStorage
-                    setPhoneVerified(true);
+                } catch (appError) {
+                    console.error("❌ Error al crear sesión de Appwrite:", appError);
                 }
+
+                setPhoneVerified(true);
+            } else {
+                console.error('Error obteniendo token de sesión');
+                setPhoneVerified(false);
             }
         } catch (error) {
             console.error('Error verifying phone:', error);

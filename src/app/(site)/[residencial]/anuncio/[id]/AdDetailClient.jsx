@@ -47,6 +47,7 @@ export default function AdDetailPage({ params, initialAd }) {
     const [mounted, setMounted] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
     const [showMetricsModal, setShowMetricsModal] = useState(false);
+    const [isNavigatingToEdit, setIsNavigatingToEdit] = useState(false);
     const variantRefs = useRef([]);
 
     // Scroll to selected variant on mobile
@@ -559,14 +560,25 @@ export default function AdDetailPage({ params, initialAd }) {
                                 <BarChart3 size={18} className="group-hover:scale-110 transition-transform" />
                                 <span className="font-semibold hidden sm:inline">Métricas</span>
                             </button>
-                            <Link
-                                href={`/${residencialSlug}/anuncio/${adId}/editar`}
-                                className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-primary text-white rounded-xl hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                            <button
+                                onClick={() => {
+                                    setIsNavigatingToEdit(true);
+                                    router.push(`/${residencialSlug}/anuncio/${adId}/editar`);
+                                }}
+                                disabled={isNavigatingToEdit}
+                                className={`inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-primary text-white rounded-xl transition-all shadow-lg shadow-primary/20 ${isNavigatingToEdit
+                                        ? 'opacity-70 cursor-not-allowed'
+                                        : 'hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98]'
+                                    }`}
                                 title="Editar"
                             >
-                                <Pencil size={18} />
+                                {isNavigatingToEdit ? (
+                                    <Loader2 size={18} className="animate-spin" />
+                                ) : (
+                                    <Pencil size={18} />
+                                )}
                                 <span className="font-semibold hidden sm:inline">Editar</span>
-                            </Link>
+                            </button>
                         </div>
                     )}
                 </div>
