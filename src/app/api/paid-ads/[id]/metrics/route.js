@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 
 const METRICS_COLLECTION = 'ad_metrics';
@@ -15,14 +15,14 @@ export async function GET(request, { params }) {
         // Fetch logs for this paid ad
         // Note: For scalability, we should use aggregation queries or the daily stats collection.
         // Following user request to sum from logs.
-        const logs = await databases.listDocuments(
-            dbId,
-            'logs',
-            [
+        const logs = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: 'logs',
+            queries: [
                 Query.equal('anuncioPagoId', id),
                 Query.limit(5000) // Safety limit
             ]
-        );
+        });
 
         // Aggregate data
         let totalSpend = 0;
@@ -32,7 +32,7 @@ export async function GET(request, { params }) {
         const byResidential = {};
         const byDate = {};
 
-        logs.documents.forEach(doc => {
+        logs.rows.forEach(doc => {
             const cost = doc.cost || 0;
             const type = doc.type;
             const resId = doc.residencialId || 'unknown';
@@ -72,16 +72,16 @@ export async function GET(request, { params }) {
             try {
                 // Fetch residentials in parallel batches or single query if possible
                 // Appwrite supports array in equal query
-                const residentialDocs = await databases.listDocuments(
-                    dbId,
-                    'residenciales',
-                    [
+                const residentialDocs = await tablesDB.listRows({
+                    databaseId: dbId,
+                    tableId: 'residenciales',
+                    queries: [
                         Query.equal('$id', uniqueResIds),
                         Query.limit(100)
                     ]
-                );
+                });
 
-                residentialDocs.documents.forEach(res => {
+                residentialDocs.rows.forEach(res => {
                     if (byResidential[res.$id]) {
                         byResidential[res.$id].name = res.nombre;
                         // Format: "Name (City, State)" or just fields

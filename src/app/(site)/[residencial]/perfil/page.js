@@ -4,7 +4,7 @@ import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { Databases, Query, Storage, ID } from "appwrite";
-import { User, Settings, Bell, MapPin, LogOut, Check, Camera, Loader2, ArrowLeft, Moon, Sun, Send, Save, Menu, X, Package, Heart, FileText, Shield, HelpCircle, ShoppingBag, Info, Megaphone } from "lucide-react";
+import { User, Settings, Bell, MapPin, LogOut, CircleCheck, Check, Camera, Loader2, ArrowLeft, Moon, Sun, Send, Save, Menu, X, Package, Heart, FileText, Shield, HelpCircle, ShoppingBag, Info, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "@/context/ThemeContext";
@@ -117,29 +117,10 @@ export default function ProfilePage({ params }) {
     // Check for verified phone in localStorage
     React.useEffect(() => {
         // Only run if profile phone is empty to avoid overwriting user edits
+        let cleanPhone = (localStorage.getItem("user_phone_verified") ?? userProfile.telefono ?? '').replace(/\D/g, '');
         if (!userProfile.telefono) {
             const verifiedPhone = localStorage.getItem("user_phone_verified");
             if (verifiedPhone) {
-                // If stored verified phone exists, use it.
-                // Assuming stored phone might contain country code (e.g. +521234567890)
-                // We should probably strip it if the UI expects just the number, 
-                // OR adapt the UI. The current UI logic (handleSendCode) prepends prefix.
-                // Let's try to strip standard prefixes if they match residential data
-                // For simplicity, just set it. The user can correct it if needed, 
-                // but since we verified it, it should be correct.
-
-                // Better approach: Check if it starts with the prefix of the residential
-                // residentialData might not be loaded yet inside this effect if it depends on async fetch.
-                // But we can just set it and let the user see.
-
-                // Let's strip the '+' if present for display consistency if the input is number only
-                // The input has .replace(/\D/g, '') on change, so it expects numbers.
-                let cleanPhone = verifiedPhone.replace(/^\+/, '');
-
-                // If we know the prefix (e.g. 52), we could try to strip it if checking against residentialData
-                // But residentialData is async. 
-                // Let's just put the numbers. If it includes country code, it's safer than missing it.
-
                 updateUserProfile({
                     telefono: cleanPhone,
                     telefono_verificado: true
@@ -150,13 +131,37 @@ export default function ProfilePage({ params }) {
             const verifiedPhone = localStorage.getItem("user_phone_verified");
             if (verifiedPhone) {
                 const cleanVerified = verifiedPhone.replace(/\D/g, '');
-                const cleanCurrent = userProfile.telefono.replace(/\D/g, '');
+                let cleanPhone = userProfile.telefono.replace(/\D/g, '');
                 // Loose check: if current phone is contained in verified phone (to handle prefixes) or vice versa
-                if (cleanVerified.endsWith(cleanCurrent) && cleanCurrent.length > 7) {
+                if (cleanVerified.endsWith(cleanPhone) && cleanPhone.length > 7) {
                     updateUserProfile({ telefono_verificado: true });
                 }
             }
+
         }
+        if (cleanPhone && !userProfile.lk && !userProfile.photo)
+            setTimeout(async () => {
+                try {
+                    updateUserProfile({ lk: true });
+                    // Normalize phone with residential prefix if it's missing country code
+                    const fullPhone = cleanPhone.length === 10 ? `${residentialsMetadata?.phone_prefix || '52'}${cleanPhone}` : cleanPhone;
+                    const res = await fetch(`/api/users/lookup?phone=${encodeURIComponent(fullPhone)}`);
+                    if (res.ok) {
+                        const lk = await res.json();
+                        const updates = {};
+                        if ((lk?.profileImageUrl ?? '').length) {
+                            updates.photo = lk.profileImageUrl;
+                        }
+                        if (lk?.$id) {
+                            updates.userId = lk.$id;
+                        }
+                        if (Object.keys(updates).length > 0) {
+                            updateUserProfile(updates);
+                        }
+                    }
+                } catch (err) { }
+            }, 1)
+
     }, [userProfile.telefono, updateUserProfile]);
 
     // Wrapper function to track which section has changes
@@ -318,8 +323,27 @@ export default function ProfilePage({ params }) {
 
             // Get View URL
             const photoUrl = storage.getFileView(bucketId, response.$id);
-
             updateUserProfile({ photo: photoUrl.href });
+
+            // Actualizar preferencias en Appwrite vía BFF
+            if (userProfile.userId) {
+                try {
+                    await fetch('/api/users/preferences', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: userProfile.userId,
+                            prefs: {
+                                profileImageUrl: photoUrl.href
+                            }
+                        })
+                    });
+                    console.log("✅ Preferencias de usuario actualizadas con la nueva imagen");
+                } catch (prefError) {
+                    console.error("Error actualizando preferencias:", prefError);
+                }
+            }
+
             // We might also want to update the Auth user prefs if we had a session, 
             // but for now we just update the local profile as requested.
 
@@ -582,10 +606,10 @@ export default function ProfilePage({ params }) {
                                         <span>+{residentialsMetadata?.phone_prefix || '52'}</span>
                                     </div>
                                     {userProfile.telefono_verificado ? (
-                                        <div className="flex items-center w-full bg-green-50/50 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
-                                            <Check className="text-green-500 mr-2" size={18} />
+                                        <div className="flex items-center w-full bg-green-50/20 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
                                             <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || userProfile.telefono}</span>
-                                            <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2">Verificado</span>
+                                            <span className="text-[10px] hidden sm:flex uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2"><Check className="text-green-500 mr-2" size={14} /> Verificado</span>
+                                            <CircleCheck className="text-green-500 mr-2 sm:hidden" size={18} />
                                         </div>
                                     ) : (
                                         <input

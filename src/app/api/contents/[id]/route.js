@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases } from '@/lib/appwrite-server';
+import { tablesDB } from '@/lib/appwrite-server';
 import { cookies } from 'next/headers';
 import { Client, Account } from 'node-appwrite';
 
@@ -66,12 +66,9 @@ export async function PATCH(request, { params }) {
         }
 
         // Update document using server SDK with API key (bypasses permissions)
-        const updatedDoc = await databases.updateDocument(
-            DATABASE_ID,
-            COLLECTION_ID,
-            id,
-            body
-        );
+        const updatedDoc = await tablesDB.updateRow({
+            databaseId: DATABASE_ID, tableId: COLLECTION_ID, rowId: id, data: body
+        });
 
         return NextResponse.json(updatedDoc);
     } catch (error) {
@@ -142,11 +139,9 @@ export async function DELETE(request, { params }) {
         }
 
         // Delete document using server SDK with API key (bypasses permissions)
-        await databases.deleteDocument(
-            DATABASE_ID,
-            COLLECTION_ID,
-            id
-        );
+        await tablesDB.deleteRow({
+            databaseId: DATABASE_ID, tableId: COLLECTION_ID, rowId: id
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

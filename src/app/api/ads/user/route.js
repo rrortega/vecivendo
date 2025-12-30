@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases } from '@/lib/appwrite-server';
+import { tablesDB } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || 'vecivendo-db';
@@ -56,19 +56,19 @@ export async function GET(request) {
 
         // Consultar anuncios con cualquiera de las variaciones
         // Query.equal acepta un array de valores para buscar con OR
-        const response = await databases.listDocuments(
-            DATABASE_ID,
-            COLLECTION_ID,
-            [
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: COLLECTION_ID,
+            queries: [
                 Query.equal('celular_anunciante', phoneVariations),
                 Query.orderDesc('$updatedAt'),
                 Query.limit(100)
             ]
-        );
+        });
 
         return NextResponse.json({
-            total: response.total,
-            documents: response.documents
+            documents: response.rows,
+            total: response.total
         });
 
     } catch (error) {

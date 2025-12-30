@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 export const dynamic = 'force-dynamic';
 
@@ -41,19 +41,19 @@ async function getTodaySpending(adId, costPerView = CREDIT_COST_VIEW, costPerCli
         const todayEnd = tomorrow.toISOString();
 
         // Try to get today's stats from stats collection
-        const statsResponse = await databases.listDocuments(
-            dbId,
-            PAID_ADS_STATS_COLLECTION_ID,
-            [
+        const statsResponse = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: PAID_ADS_STATS_COLLECTION_ID,
+            queries: [
                 Query.equal('ad_id', adId),
                 Query.greaterThanEqual('date', todayStart),
                 Query.lessThan('date', todayEnd),
                 Query.limit(1)
             ]
-        ).catch(() => ({ documents: [] }));
+        }).catch(() => ({ rows: [] }));
 
-        if (statsResponse.documents.length > 0) {
-            const stats = statsResponse.documents[0];
+        if (statsResponse.rows.length > 0) {
+            const stats = statsResponse.rows[0];
             const views = stats.views || 0;
             const clicks = stats.clicks || 0;
             return (views * costPerView) + (clicks * costPerClick);
@@ -100,13 +100,11 @@ export async function GET(request) {
             queries.push(Query.equal('type', type));
         }
 
-        const response = await databases.listDocuments(
-            dbId,
-            PAID_ADS_COLLECTION_ID,
-            queries
-        );
+        const response = await tablesDB.listRows({
+            databaseId: dbId, tableId: PAID_ADS_COLLECTION_ID, queries: queries
+        });
 
-        let ads = response.documents;
+        let ads = response.rows;
 
 
         // Filter by category logic:

@@ -17,6 +17,7 @@ import { getSessionId } from "@/lib/analytics";
 export default function PaidAdCard({ ad, residentialSlug, viewMode = "grid", currency = "MXN" }) {
     const [hasTrackedView, setHasTrackedView] = useState(false);
     const [showRedirectOverlay, setShowRedirectOverlay] = useState(false);
+    const [imageError, setImageError] = useState(false);
     const cardRef = useRef(null);
 
     // Check if view was already tracked in this session
@@ -95,17 +96,22 @@ export default function PaidAdCard({ ad, residentialSlug, viewMode = "grid", cur
 
     const CardContent = () => (
         <>
-            {/* Image Section - EXACT same as free ads */}
             <div className={`${viewMode === "list" ? "w-40 md:w-56 shrink-0" : "aspect-[4/3]"} relative overflow-hidden bg-gray-100 dark:bg-white/5`}>
-                {imageUrl ? (
+                {imageUrl && !imageError ? (
                     <img
                         src={imageUrl}
                         alt={ad.titulo}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={() => setImageError(true)}
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-text-secondary">
                         <ImageOff size={24} className="opacity-50" />
+                        {imageError && (
+                            <div className="absolute inset-0 flex items-center justify-center p-2 text-center bg-black/5">
+                                <span className="text-[10px] font-medium text-gray-500">Imagen no disponible</span>
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 
 const PAID_ADS_COLLECTION_ID = 'anuncios_pago';
 
@@ -7,11 +7,9 @@ export async function GET(request, { params }) {
     const { id } = params;
 
     try {
-        const document = await databases.getDocument(
-            dbId,
-            PAID_ADS_COLLECTION_ID,
-            id
-        );
+        const document = await tablesDB.getRow({
+            databaseId: dbId, tableId: PAID_ADS_COLLECTION_ID, rowId: id
+        });
 
         return NextResponse.json(document);
     } catch (error) {
@@ -53,12 +51,9 @@ export async function PATCH(request, { params }) {
         delete payload.categorias;
         delete payload.dailyImpact;
 
-        const result = await databases.updateDocument(
-            dbId,
-            PAID_ADS_COLLECTION_ID,
-            id,
-            payload
-        );
+        const result = await tablesDB.updateRow({
+            databaseId: dbId, tableId: PAID_ADS_COLLECTION_ID, rowId: id, data: payload
+        });
 
         return NextResponse.json(result);
     } catch (error) {
@@ -70,11 +65,9 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
     const { id } = params;
     try {
-        await databases.deleteDocument(
-            dbId,
-            PAID_ADS_COLLECTION_ID,
-            id
-        );
+        await tablesDB.deleteRow({
+            databaseId: dbId, tableId: PAID_ADS_COLLECTION_ID, rowId: id
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

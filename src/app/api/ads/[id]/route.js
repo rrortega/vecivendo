@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId, adsCollectionId } from '@/lib/appwrite-server';
+import { tablesDB, dbId, adsTableId } from '@/lib/appwrite-server';
 import { cleanDocument } from '@/lib/response-cleaner';
 import { cookies } from 'next/headers';
 import { Client, Account } from 'node-appwrite';
@@ -53,7 +53,7 @@ async function verifyAccess(request, adId) {
         throw new Error('ID de anuncio requerido para verificar propiedad.');
     }
 
-    const ad = await databases.getDocument(dbId, adsCollectionId, adId);
+    const ad = await tablesDB.getRow({ databaseId: dbId, tableId: adsTableId, rowId: adId });
 
     // Normalize phones for comparison
     const userPhone = user.phone ? user.phone.replace(/\D/g, '') : '';
@@ -70,7 +70,7 @@ async function verifyAccess(request, adId) {
 export async function GET(request, { params }) {
     try {
         const { id } = params;
-        const document = await databases.getDocument(dbId, adsCollectionId, id);
+        const document = await tablesDB.getRow({ databaseId: dbId, tableId: adsTableId, rowId: id });
         return NextResponse.json(cleanDocument(document));
     } catch (error) {
         console.error('❌ [API] Error obteniendo anuncio:', error);
@@ -92,12 +92,9 @@ export async function PATCH(request, { params }) {
 
         console.log('✏️ [API] Actualizando anuncio:', id);
 
-        const document = await databases.updateDocument(
-            dbId,
-            adsCollectionId,
-            id,
-            body
-        );
+        const document = await tablesDB.updateRow({
+            databaseId: dbId, tableId: adsTableId, rowId: id, data: body
+        });
 
         return NextResponse.json(document);
     } catch (error) {
@@ -120,7 +117,7 @@ export async function DELETE(request, { params }) {
 
         console.log('🗑️ [API] Eliminando anuncio:', id);
 
-        await databases.deleteDocument(dbId, adsCollectionId, id);
+        await tablesDB.deleteRow({ databaseId: dbId, tableId: adsTableId, rowId: id });
 
         return NextResponse.json({ success: true, id });
     } catch (error) {

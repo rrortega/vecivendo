@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { client } from "@/lib/appwrite";
 import { Query } from 'node-appwrite';
 
@@ -26,13 +26,9 @@ export async function GET(request) {
             );
         }
 
-        const response = await databases.listDocuments(
-            dbId,
-            COLLECTION_ID,
-            [Query.equal('slug', slug), Query.limit(1)]
-        );
+        const response = await tablesDB.listRows({ databaseId: dbId, tableId: COLLECTION_ID, queries: [Query.equal('slug', slug), Query.limit(1)] });
 
-        if (response.documents.length === 0) {
+        if (response.rows.length === 0) {
             return NextResponse.json(
                 { error: 'Residential not found' },
                 { status: 404 }
@@ -40,7 +36,7 @@ export async function GET(request) {
         }
 
         return NextResponse.json({
-            residential: response.documents[0],
+            residential: response.rows[0],
         }, {
             headers: {
                 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',

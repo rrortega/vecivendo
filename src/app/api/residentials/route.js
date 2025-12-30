@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId, residentialsCollectionId } from '@/lib/appwrite-server';
+import { tablesDB, dbId, residentialsTableId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 import { cleanDocument } from '@/lib/response-cleaner';
 
@@ -19,16 +19,16 @@ export async function GET(request) {
 
         // Fetch by ID directly if provided (more efficient)
         if (id) {
-            document = await databases.getDocument(dbId, residentialsCollectionId, id);
+            document = await tablesDB.getRow({ databaseId: dbId, tableId: residentialsTableId, rowId: id });
         } else if (slug) {
             // Fetch by Slug
-            const response = await databases.listDocuments(
-                dbId,
-                residentialsCollectionId,
-                [Query.equal('slug', slug)]
-            );
-            if (response.documents.length > 0) {
-                document = response.documents[0];
+            const response = await tablesDB.listRows({
+                databaseId: dbId,
+                tableId: residentialsTableId,
+                queries: [Query.equal('slug', slug)]
+            });
+            if (response.rows.length > 0) {
+                document = response.rows[0];
             }
         }
 

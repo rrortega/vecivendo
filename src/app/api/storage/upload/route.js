@@ -82,12 +82,21 @@ export async function POST(request) {
         const adId = formData.get('adId');
         if (adId) {
             try {
-                const { databases, dbId, adsCollectionId } = await import('@/lib/appwrite-server');
-                const ad = await databases.getDocument(dbId, adsCollectionId, adId);
+                const { tablesDB, dbId, adsTableId } = await import('@/lib/appwrite-server');
+                const ad = await tablesDB.getRow({
+                    databaseId: dbId,
+                    tableId: adsTableId,
+                    rowId: adId
+                });
                 const currentImages = ad.imagenes || [];
 
-                await databases.updateDocument(dbId, adsCollectionId, adId, {
-                    imagenes: [...currentImages, s3Url]
+                await tablesDB.updateRow({
+                    databaseId: dbId,
+                    tableId: adsTableId,
+                    rowId: adId,
+                    data: {
+                        imagenes: [...currentImages, s3Url]
+                    }
                 });
                 console.log('✅ [API] Imagen añadida al anuncio:', adId);
             } catch (dbError) {

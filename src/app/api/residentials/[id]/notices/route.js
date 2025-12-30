@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId, residentialsCollectionId } from '@/lib/appwrite-server';
+import { tablesDB, dbId, residentialsTableId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 import { cleanDocuments } from '@/lib/response-cleaner';
 import { unstable_cache } from 'next/cache';
@@ -13,14 +13,14 @@ const resolveResidentialId = unstable_cache(
         // If we want to be safe, we query.
 
         // 1. Try to fetch residential by slug
-        const resDocs = await databases.listDocuments(
-            dbId,
-            residentialsCollectionId,
-            [Query.equal('slug', slugOrId)]
-        );
+        const resDocs = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: residentialsTableId,
+            queries: [Query.equal('slug', slugOrId)]
+        });
 
-        if (resDocs.documents.length > 0) {
-            return resDocs.documents[0].$id;
+        if (resDocs.rows.length > 0) {
+            return resDocs.rows[0].$id;
         }
 
         // 2. If not found by slug, maybe it IS an ID? 
@@ -68,15 +68,15 @@ export async function GET(request, { params }) {
             Query.limit(100) // Increase limit to fetch enough candidates before client-side filtering
         ];
 
-        const response = await databases.listDocuments(
-            dbId,
-            'avisos_comunidad',
-            queries
-        );
+        const response = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: 'avisos_comunidad',
+            queries: queries
+        });
 
         // 3. Filter active notices (Server-side logic)
         const now = new Date();
-        const activeNotices = response.documents.filter(doc => {
+        const activeNotices = response.rows.filter(doc => {
             if (doc.duracion_dias && doc.$createdAt) {
                 try {
                     const createdDate = new Date(doc.$createdAt);

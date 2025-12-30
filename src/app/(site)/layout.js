@@ -61,7 +61,7 @@ export const viewport = {
   userScalable: false, // Mobile-app like feel
 };
 
-import { databases } from "@/lib/server/appwrite";
+import { tablesDB } from "@/lib/server/appwrite";
 import { Query } from "node-appwrite";
 import parse from "html-react-parser";
 
@@ -70,13 +70,17 @@ async function getGlobalScripts() {
     const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
     const collectionId = "configuracion_global";
 
-    // Using server-side SDK (node-appwrite)
-    const response = await databases.listDocuments(dbId, collectionId, [
-      Query.limit(1)
-    ]);
+    // Using server-side SDK (node-appwrite) with TablesDB
+    const response = await tablesDB.listRows({
+      databaseId: dbId,
+      tableId: collectionId,
+      queries: [
+        Query.limit(1)
+      ]
+    });
 
-    if (response.documents.length > 0) {
-      const doc = response.documents[0];
+    if (response.rows.length > 0) {
+      const doc = response.rows[0];
       console.log("Global scripts fetched successfully"); // Debug log relative to system, visible in server logs
       return {
         header: doc.scripts_header || "",

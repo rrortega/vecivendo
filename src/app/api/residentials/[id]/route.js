@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId, residentialsCollectionId, adsCollectionId } from '@/lib/appwrite-server';
+import { tablesDB, dbId, residentialsTableId, adsTableId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 
 // DELETE /api/residentials/[id] - Eliminar residencial con cascada
@@ -10,20 +10,20 @@ export async function DELETE(request, { params }) {
         console.log('🗑️ [API] Iniciando eliminación en cascada de residencial:', id);
 
         // 1. Buscar todos los anuncios del residencial
-        const adsResponse = await databases.listDocuments(
-            dbId,
-            adsCollectionId,
-            [Query.equal('residencial', id)]
-        );
+        const adsResponse = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: adsTableId,
+            queries: [Query.equal('residencial', id)]
+        });
 
         const adsCount = adsResponse.total;
         console.log(`📋 [API] Encontrados ${adsCount} anuncios asociados al residencial`);
 
         // 2. Eliminar todos los anuncios asociados
         if (adsCount > 0) {
-            const deletePromises = adsResponse.documents.map(ad => {
+            const deletePromises = adsResponse.rows.map(ad => {
                 console.log(`🔄 [API] Eliminando anuncio asociado: ${ad.$id}`);
-                return databases.deleteDocument(dbId, adsCollectionId, ad.$id)
+                return tablesDB.deleteRow({ databaseId: dbId, tableId: adsTableId, rowId: ad.$id })
                     .then(() => {
                         console.log(`✅ [API] Anuncio ${ad.$id} eliminado`);
                         return { id: ad.$id, success: true };
@@ -53,7 +53,7 @@ export async function DELETE(request, { params }) {
 
         // 3. Eliminar el residencial
         console.log('🔄 [API] Eliminando residencial:', id);
-        await databases.deleteDocument(dbId, residentialsCollectionId, id);
+        await tablesDB.deleteRow({ databaseId: dbId, tableId: residentialsTableId, rowId: id });
 
         console.log('✅ [API] Residencial eliminado exitosamente');
 

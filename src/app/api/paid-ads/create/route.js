@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { ID } from 'node-appwrite';
 
 const PAID_ADS_COLLECTION_ID = 'anuncios_pago';
@@ -49,12 +49,9 @@ export async function POST(request) {
         };
 
         // 4. Create Document
-        const result = await databases.createDocument(
-            dbId,
-            PAID_ADS_COLLECTION_ID,
-            ID.unique(),
-            payload
-        );
+        const result = await tablesDB.createRow({
+            databaseId: dbId, tableId: PAID_ADS_COLLECTION_ID, rowId: ID.unique(), data: payload
+        });
 
         return NextResponse.json(result, { status: 201 });
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId as defaultDbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId as defaultDbId } from '@/lib/appwrite-server';
 import { cleanDocuments, cleanDocument } from '@/lib/response-cleaner';
 import { Query } from 'node-appwrite';
 
@@ -111,14 +111,14 @@ export async function GET(request) {
 
         let response;
         if (docId) {
-            response = await databases.getDocument(dbId, colId, docId);
+            response = await tablesDB.getRow({ databaseId: dbId, tableId: colId, rowId: docId });
             const cleaned = cleanDocument(response);
             return NextResponse.json(cleaned, {
                 headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
             });
         } else {
-            response = await databases.listDocuments(dbId, colId, safeQueries);
-            const cleaned = cleanDocuments(response.documents);
+            response = await tablesDB.listRows({ databaseId: dbId, tableId: colId, queries: safeQueries });
+            const cleaned = cleanDocuments(response.rows);
             return NextResponse.json({
                 documents: cleaned,
                 total: response.total

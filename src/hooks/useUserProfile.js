@@ -12,7 +12,8 @@ export const useUserProfile = (residencialSlug = null) => {
         telefono: '',
         telefono_verificado: false,
         userId: null,
-        photo: null
+        photo: null,
+        lk: false
     });
 
     // Datos específicos del residencial (cambian por residencial)
@@ -73,7 +74,7 @@ export const useUserProfile = (residencialSlug = null) => {
 
     const updateUserProfile = (newProfile) => {
         // Separar las actualizaciones en globales y residenciales
-        const globalFields = ['nombre', 'telefono', 'telefono_verificado', 'userId', 'photo'];
+        const globalFields = ['nombre', 'telefono', 'telefono_verificado', 'userId', 'photo', 'lk'];
         const residentialFields = ['calle', 'manzana', 'lote', 'casa', 'ubicacion', 'lat', 'lng'];
 
         const globalUpdates = {};
@@ -94,6 +95,7 @@ export const useUserProfile = (residencialSlug = null) => {
         if (Object.keys(residentialUpdates).length > 0) {
             setResidentialData(prev => ({ ...prev, ...residentialUpdates }));
         }
+
 
         setIsDirty(true);
     };

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId, adsCollectionId } from '@/lib/appwrite-server';
+import { tablesDB, dbId, adsTableId } from '@/lib/appwrite-server';
 
 // POST /api/ads/batch-delete - Eliminar múltiples anuncios
 export async function POST(request) {
@@ -27,7 +27,7 @@ export async function POST(request) {
 
                 const chunkPromises = chunk.map(id => {
                     console.log(`   🗑️ Intentando eliminar anuncio: ${id}`);
-                    return databases.deleteDocument(dbId, adsCollectionId, id)
+                    return tablesDB.deleteRow({ databaseId: dbId, tableId: adsTableId, rowId: id })
                         .then(() => {
                             console.log(`   ✅ Anuncio ${id} eliminado exitosamente`);
                             return { id, success: true };

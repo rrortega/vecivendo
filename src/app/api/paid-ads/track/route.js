@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { ID, Query } from 'node-appwrite';
 
 const PAID_ADS_COLLECTION_ID = 'anuncios_pago';
@@ -16,9 +16,9 @@ async function getCost(type) {
     try {
         const collectionId = type === 'view' ? COSTS_COLLECTION_VIEW : COSTS_COLLECTION_CLICK;
         // Try to fetch specific cost doc or list first one
-        const response = await databases.listDocuments(dbId, collectionId, [Query.limit(1)]);
-        if (response.documents.length > 0) {
-            return response.documents[0].costo || (type === 'view' ? 1 : 5);
+        const response = await tablesDB.listRows({ databaseId: dbId, tableId: collectionId, queries: [Query.limit(1)] });
+        if (response.rows.length > 0) {
+            return response.rows[0].costo || (type === 'view' ? 1 : 5);
         }
         return type === 'view' ? 1 : 5;
     } catch (error) {
@@ -60,11 +60,11 @@ export async function POST(request) {
         const cost = await getCost(type);
 
         // Get current ad
-        const ad = await databases.getDocument(
-            dbId,
-            PAID_ADS_COLLECTION_ID,
-            adId
-        );
+        const ad = await tablesDB.getRow({
+            databaseId: dbId,
+            tableId: PAID_ADS_COLLECTION_ID,
+            rowId: adId
+        });
 
         if (!ad) {
             return NextResponse.json({ error: 'Ad not found' }, { status: 404 });
@@ -76,11 +76,11 @@ export async function POST(request) {
         const shouldDeactivate = newCredits <= 0;
 
         // Log to central logs table
-        const logPromise = databases.createDocument(
-            dbId,
-            LOGS_COLLECTION_ID,
-            ID.unique(),
-            {
+        const logPromise = tablesDB.createRow({
+            databaseId: dbId,
+            tableId: LOGS_COLLECTION_ID,
+            rowId: ID.unique(),
+            data: {
                 anuncioPagoId: adId,
                 type: type,
                 sessionId: sessionId || 'unknown',
@@ -92,7 +92,7 @@ export async function POST(request) {
                 residencialId: residentialId || null,
                 cost: cost
             }
-        ).catch(err => {
+        }).catch(err => {
             console.warn('⚠️ [API] Failed to write to logs collection:', err.message);
         });
 
@@ -112,12 +112,12 @@ export async function POST(request) {
         }
 
         // Update the main ad document
-        await databases.updateDocument(
-            dbId,
-            PAID_ADS_COLLECTION_ID,
-            adId,
-            updateData
-        );
+        await tablesDB.updateRow({
+            databaseId: dbId,
+            tableId: PAID_ADS_COLLECTION_ID,
+            rowId: adId,
+            data: updateData
+        });
 
         // Update or create daily stats
         const statsPromise = updateDailyStats(adId, type);
@@ -150,39 +150,39 @@ async function updateDailyStats(adId, type) {
         const todayStr = today.toISOString();
 
         // Try to find existing stats for today
-        const existingStats = await databases.listDocuments(
-            dbId,
-            PAID_ADS_STATS_COLLECTION_ID,
-            [
+        const existingStats = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: PAID_ADS_STATS_COLLECTION_ID,
+            queries: [
                 Query.equal('ad_id', adId),
                 Query.equal('date', todayStr),
                 Query.limit(1)
             ]
-        ).catch(() => ({ documents: [] }));
+        }).catch(() => ({ rows: [] }));
 
-        if (existingStats.documents.length > 0) {
+        if (existingStats.rows.length > 0) {
             // Update existing stats
-            const stats = existingStats.documents[0];
+            const stats = existingStats.rows[0];
             const updateField = type === 'view' ? 'views' : 'clicks';
-            await databases.updateDocument(
-                dbId,
-                PAID_ADS_STATS_COLLECTION_ID,
-                stats.$id,
-                { [updateField]: (stats[updateField] || 0) + 1 }
-            );
+            await tablesDB.updateRow({
+                databaseId: dbId,
+                tableId: PAID_ADS_STATS_COLLECTION_ID,
+                rowId: stats.$id,
+                data: { [updateField]: (stats[updateField] || 0) + 1 }
+            });
         } else {
             // Create new stats document for today
-            await databases.createDocument(
-                dbId,
-                PAID_ADS_STATS_COLLECTION_ID,
-                ID.unique(),
-                {
+            await tablesDB.createRow({
+                databaseId: dbId,
+                tableId: PAID_ADS_STATS_COLLECTION_ID,
+                rowId: ID.unique(),
+                data: {
                     ad_id: adId,
                     date: todayStr,
                     views: type === 'view' ? 1 : 0,
                     clicks: type === 'click' ? 1 : 0,
                 }
-            ).catch((error) => {
+            }).catch((error) => {
                 // Collection might not exist yet, log but don't fail
                 console.warn('[Track] Could not create daily stats:', error.message);
             });

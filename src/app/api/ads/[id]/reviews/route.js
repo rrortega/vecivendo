@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 import { cleanDocuments } from '@/lib/response-cleaner';
 
@@ -24,13 +24,11 @@ export async function GET(request, { params }) {
             Query.offset(offset)
         ];
 
-        const response = await databases.listDocuments(
-            dbId,
-            'reviews',
-            queries
-        );
+        const response = await tablesDB.listRows({
+            databaseId: dbId, tableId: 'reviews', queries: queries
+        });
 
-        const cleaned = cleanDocuments(response.documents);
+        const cleaned = cleanDocuments(response.rows);
 
         return NextResponse.json({
             documents: cleaned,

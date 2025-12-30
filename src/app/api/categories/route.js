@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 import { cleanDocuments } from '@/lib/response-cleaner';
 
@@ -7,16 +7,16 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
     try {
-        const response = await databases.listDocuments(
-            dbId,
-            'categorias', // Collection ID for categories
-            [
+        const response = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: 'categorias',
+            queries: [
                 Query.equal("activo", true),
                 Query.orderAsc("orden")
             ]
-        );
+        });
 
-        const cleanedDocuments = cleanDocuments(response.documents);
+        const cleanedDocuments = cleanDocuments(response.rows);
 
         return NextResponse.json({
             documents: cleanedDocuments,

@@ -30,6 +30,49 @@ const getCountryFlag = (country) => {
   return map[country.toLowerCase()] || "🏳️";
 };
 
+/**
+ * MemberBadge - Fetches and displays the member count for a residential
+ */
+const MemberBadge = ({ residentialId }) => {
+  const [count, setCount] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!residentialId) return;
+
+    const fetchCount = async () => {
+      try {
+        const res = await fetch(`/api/residentials/members?id=${encodeURIComponent(residentialId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setCount(data.count);
+        } else {
+          setError(true);
+        }
+      } catch (err) {
+        console.error("Error fetching member count:", err);
+        setError(true);
+      }
+    };
+
+    fetchCount();
+  }, [residentialId]);
+
+  if (error) return null;
+  if (count === null) return null;
+
+  return (
+    <div className="absolute top-3 right-3 z-10 animate-in fade-in zoom-in duration-500">
+      <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-2 py-1 rounded-lg border border-white/20 shadow-lg flex items-center gap-1.5">
+        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+        <span className="text-[10px] font-bold text-text-main">
+          {count} {count === 1 ? 'miembro' : 'miembros'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 function LandingPageContent() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -282,6 +325,7 @@ function LandingPageContent() {
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60" />
+                    <MemberBadge residentialId={res.$id} />
                   </div>
                   <div className="p-5 flex flex-col flex-1 justify-center">
                     <div className="flex-1">

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Query } from 'node-appwrite';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import {
     calculateAdKPIs,
     calculateOrderKPIs,
@@ -98,22 +98,22 @@ export async function GET(request) {
             previousReviews
         ] = await Promise.all([
             // Current
-            databases.listDocuments(dbId, 'anuncios', adQueries),
-            databases.listDocuments(dbId, 'logs', currentLogsQuery),
-            databases.listDocuments(dbId, 'pedidos', currentOrdersQuery),
-            databases.listDocuments(dbId, 'reviews', [Query.limit(LIMIT)]),
-            databases.listDocuments(dbId, 'anuncios_pago', [Query.limit(LIMIT)]),
-            databases.listDocuments(dbId, 'categorias', [Query.limit(100)]),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'anuncios', queries: adQueries }),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'logs', queries: currentLogsQuery }),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'pedidos', queries: currentOrdersQuery }),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'reviews', queries: [Query.limit(LIMIT)] }),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'anuncios_pago', queries: [Query.limit(LIMIT)] }),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'categorias', queries: [Query.limit(100)] }),
 
             // Previous
-            databases.listDocuments(dbId, 'logs', previousLogsQuery),
-            databases.listDocuments(dbId, 'pedidos', previousOrdersQuery),
-            databases.listDocuments(dbId, 'reviews', [Query.limit(LIMIT)])
+            tablesDB.listRows({ databaseId: dbId, tableId: 'logs', queries: previousLogsQuery }),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'pedidos', queries: previousOrdersQuery }),
+            tablesDB.listRows({ databaseId: dbId, tableId: 'reviews', queries: [Query.limit(LIMIT)] })
         ]);
 
         // Post-processing same as client hook
         // Build Category Map
-        const fetchedCategories = currentCategoriesDocs?.documents || [];
+        const fetchedCategories = currentCategoriesDocs?.rows || [];
         const categoriesMap = fetchedCategories.reduce((acc, cat) => {
             acc[cat.$id] = cat.nombre;
             return acc;
@@ -129,22 +129,22 @@ export async function GET(request) {
             });
         };
 
-        const validCurrentReviews = filterDate(currentReviews.documents, startDate, endDate);
-        const validPreviousReviews = filterDate(previousReviews.documents, previousStart, previousEnd);
+        const validCurrentReviews = filterDate(currentReviews.rows, startDate, endDate);
+        const validPreviousReviews = filterDate(previousReviews.rows, previousStart, previousEnd);
 
-        const adDocs = currentAds.documents;
-        const paidDocs = currentPaidAds.documents;
-        const paidLogs = currentLogs.documents; // Approximation as per original client logic
-        const previousPaidLogs = previousLogs.documents;
+        const adDocs = currentAds.rows;
+        const paidDocs = currentPaidAds.rows;
+        const paidLogs = currentLogs.rows; // Approximation as per original client logic
+        const previousPaidLogs = previousLogs.rows;
 
         // Calculate KPIs
         const adKPIs = calculateAdKPIs(adDocs, adDocs, categoriesMap);
-        const orderKPIs = calculateOrderKPIs(currentOrders.documents, previousOrders.documents);
+        const orderKPIs = calculateOrderKPIs(currentOrders.rows, previousOrders.rows);
         const qualityKPIs = calculateQualityKPIs(validCurrentReviews, validPreviousReviews);
-        const engagementKPIs = calculateEngagementKPIs(currentLogs.documents, previousLogs.documents);
+        const engagementKPIs = calculateEngagementKPIs(currentLogs.rows, previousLogs.rows);
         const userKPIs = calculateUserKPIs(adDocs, adDocs);
-        const paidAdKPIs = calculatePaidAdKPIs(paidDocs, paidLogs, currentOrders.documents, previousPaidLogs, previousOrders.documents);
-        const systemHealth = calculateSystemHealth(currentLogs.documents);
+        const paidAdKPIs = calculatePaidAdKPIs(paidDocs, paidLogs, currentOrders.rows, previousPaidLogs, previousOrders.rows);
+        const systemHealth = calculateSystemHealth(currentLogs.rows);
 
         return NextResponse.json({
             ads: adKPIs,

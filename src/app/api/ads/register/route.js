@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
-import { databases } from '@/lib/appwrite-server';
+import { tablesDB, dbId, adsTableId } from '@/lib/appwrite-server';
 import { Query, ID } from 'node-appwrite';
-
-const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
-const adsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_ADS_COLLECTION || "anuncios";
 
 // API Key validation
 const VALID_API_KEY = process.env.ADS_API_KEY;
@@ -55,28 +52,28 @@ export async function POST(request) {
         }
 
         // 4. Buscar anuncio existente con mismo título, precio y celular
-        const existingAds = await databases.listDocuments(
-            dbId,
-            adsCollectionId,
-            [
+        const existingAds = await tablesDB.listRows({
+            databaseId: dbId,
+            tableId: adsTableId,
+            queries: [
                 Query.equal('titulo', titulo),
                 Query.equal('precio', precio),
                 Query.equal('celular_anunciante', celular_anunciante),
                 Query.limit(1)
             ]
-        );
+        });
 
         const now = new Date().toISOString();
 
         // 5. Si existe, actualizar y extender
-        if (existingAds.documents.length > 0) {
-            const existingAd = existingAds.documents[0];
+        if (existingAds.rows.length > 0) {
+            const existingAd = existingAds.rows[0];
 
-            const updatedAd = await databases.updateDocument(
-                dbId,
-                adsCollectionId,
-                existingAd.$id,
-                {
+            const updatedAd = await tablesDB.updateRow({
+                databaseId: dbId,
+                tableId: adsTableId,
+                rowId: existingAd.$id,
+                data: {
                     ...otherFields,
                     titulo,
                     precio,
@@ -84,7 +81,7 @@ export async function POST(request) {
                     last_capture: now,
                     activo: true // Reactivar si estaba inactivo
                 }
-            );
+            });
 
             return NextResponse.json({
                 success: true,
@@ -100,11 +97,11 @@ export async function POST(request) {
         }
 
         // 6. Si no existe, crear nuevo
-        const newAd = await databases.createDocument(
-            dbId,
-            adsCollectionId,
-            ID.unique(),
-            {
+        const newAd = await tablesDB.createRow({
+            databaseId: dbId,
+            tableId: adsTableId,
+            rowId: ID.unique(),
+            data: {
                 ...otherFields,
                 titulo,
                 precio,
@@ -112,7 +109,7 @@ export async function POST(request) {
                 last_capture: now,
                 activo: true
             }
-        );
+        });
 
         return NextResponse.json({
             success: true,

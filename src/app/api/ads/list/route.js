@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId } from '@/lib/appwrite-server';
+import { tablesDB, dbId } from '@/lib/appwrite-server';
 import { Query } from 'node-appwrite';
 export const dynamic = 'force-dynamic';
 
@@ -70,13 +70,15 @@ export async function GET(request) {
 
             try {
                 const catCollectionId = 'categorias';
-                const catDocs = await databases.listDocuments(dbId, catCollectionId, [
-                    Query.equal('slug', catLower),
-                    Query.limit(1)
-                ]);
+                const catDocs = await tablesDB.listRows({
+                    databaseId: dbId, tableId: catCollectionId, queries: [
+                        Query.equal('slug', catLower),
+                        Query.limit(1)
+                    ]
+                });
 
-                if (catDocs.documents.length > 0) {
-                    catNameForQuery = catDocs.documents[0].nombre;
+                if (catDocs.rows.length > 0) {
+                    catNameForQuery = catDocs.rows[0].nombre;
                 }
             } catch (catError) {
                 console.warn('[API /api/ads/list] Could not resolve category name from slug:', catError.message);
@@ -97,10 +99,10 @@ export async function GET(request) {
         }
 
         // Execute query
-        const response = await databases.listDocuments(dbId, COLLECTION_ID, queries);
+        const response = await tablesDB.listRows({ databaseId: dbId, tableId: COLLECTION_ID, queries: queries });
 
         return NextResponse.json({
-            documents: response.documents.map(d => {
+            documents: response.rows.map(d => {
                 // delete d['$createdAt'];
                 delete d['$updatedAt'];
                 delete d['$permissions'];

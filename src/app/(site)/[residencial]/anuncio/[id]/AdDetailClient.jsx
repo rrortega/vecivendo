@@ -48,6 +48,7 @@ export default function AdDetailPage({ params, initialAd }) {
     const [isOwner, setIsOwner] = useState(false);
     const [showMetricsModal, setShowMetricsModal] = useState(false);
     const [isNavigatingToEdit, setIsNavigatingToEdit] = useState(false);
+    const [imageErrors, setImageErrors] = useState(new Set()); // Track failed images
     const variantRefs = useRef([]);
 
     // Scroll to selected variant on mobile
@@ -567,8 +568,8 @@ export default function AdDetailPage({ params, initialAd }) {
                                 }}
                                 disabled={isNavigatingToEdit}
                                 className={`inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-primary text-white rounded-xl transition-all shadow-lg shadow-primary/20 ${isNavigatingToEdit
-                                        ? 'opacity-70 cursor-not-allowed'
-                                        : 'hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98]'
+                                    ? 'opacity-70 cursor-not-allowed'
+                                    : 'hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98]'
                                     }`}
                                 title="Editar"
                             >
@@ -821,25 +822,24 @@ export default function AdDetailPage({ params, initialAd }) {
                                 Anunciante
                             </h3>
                             <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
-                                    <UserIcon className="text-primary" size={28} />
+                                <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center relative overflow-hidden">
+                                    <img alt="Profile" className="w-full h-full object-cover" src={advertiserInfo?.profileImageUrl ?? `https://api.dicebear.com/9.x/shapes/svg?seed=${ad.celular_anunciante || 'default'}`} />
                                 </div>
                                 <div className="flex-1">
                                     <p
                                         key={advertiserInfo ? 'real-name' : 'placeholder-name'}
                                         className="font-semibold text-text-main text-lg animate-in fade-in duration-300"
                                     >
-                                        {advertiserInfo ? advertiserInfo.name : (ad.celular_anunciante ? `Vecino (${ad.celular_anunciante.slice(-4)})` : "Vecino de la comunidad")}
+                                        {advertiserInfo ? advertiserInfo.name : `Vecin@`}
+                                        <br /><small>+{`${ad.celular_anunciante.replace('+', '').slice(0, 2)}*****${ad.celular_anunciante.slice(-4)}`}</small>
                                     </p>
                                     <div className="flex items-center gap-1 text-sm text-text-secondary">
                                         {/* Fake ratings removed */}
                                         {/* Only show if we had real ratings, e.g. advertiserInfo.rating */}
-                                        {mounted && advertiserInfo && advertiserInfo.createdAt && (
-                                            <span>Miembro desde {new Date(advertiserInfo.registrationDate).getFullYear()}</span>
+                                        {mounted && advertiserInfo && advertiserInfo.registrationDate && (
+                                            <span>Miembro desde {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"][new Date(advertiserInfo.registrationDate).getMonth()]} de {new Date(advertiserInfo.registrationDate).getFullYear()}</span>
                                         )}
-                                        {!advertiserInfo && (
-                                            <span>Vecino verificado</span>
-                                        )}
+
                                     </div>
                                 </div>
                             </div>
@@ -878,15 +878,25 @@ export default function AdDetailPage({ params, initialAd }) {
                                             className="group bg-surface rounded-xl overflow-hidden border border-border hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
                                         >
                                             <div className="aspect-square bg-gray-100 dark:bg-white/5 relative overflow-hidden">
-                                                {firstImage ? (
+                                                {firstImage && !imageErrors.has(related.$id) ? (
                                                     <img
                                                         src={firstImage}
                                                         alt={related.titulo}
                                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                        onError={() => {
+                                                            setImageErrors(prev => new Set([...prev, related.$id]));
+                                                        }}
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center">
+                                                    <div className="w-full h-full flex items-center justify-center relative">
                                                         <Package size={32} className="text-text-secondary opacity-30" />
+                                                        {imageErrors.has(related.$id) && (
+                                                            <div className="absolute inset-0 flex items-center justify-center p-2 text-center">
+                                                                <span className="bg-red-500/10 backdrop-blur-sm text-red-600 dark:text-red-400 text-[10px] font-medium px-2 py-1 rounded-lg border border-red-500/20 shadow-sm">
+                                                                    Imagen eliminada
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -894,9 +904,21 @@ export default function AdDetailPage({ params, initialAd }) {
                                                 <h3 className="font-medium text-text-main line-clamp-2 text-sm mb-2 group-hover:text-primary transition-colors">
                                                     {related.titulo}
                                                 </h3>
-                                                <p className="text-lg font-bold text-primary">
-                                                    {formatPrice(related.precio)}
-                                                </p>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-lg font-bold text-primary">
+                                                        {formatPrice(related.precio)}
+                                                    </p>
+                                                    <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center relative overflow-hidden shrink-0 border border-white/20 shadow-sm">
+                                                        <img
+                                                            alt="Profile"
+                                                            className="w-full h-full object-cover"
+                                                            src={advertiserInfo ? advertiserInfo.profileImageUrl : `https://api.dicebear.com/9.x/shapes/svg?seed=${related.celular_anunciante || related.$id}`}
+                                                            onError={(e) => {
+                                                                e.target.src = `https://api.dicebear.com/9.x/shapes/svg?seed=${related.celular_anunciante || related.$id}`;
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         </Link>
                                     );

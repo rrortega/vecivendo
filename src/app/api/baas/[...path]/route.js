@@ -95,9 +95,12 @@ async function proxyRequest(request, params) {
             // Apply response cleaning (remove system attributes and nulls)
             if (data && typeof data === 'object') {
                 if (Array.isArray(data.documents)) {
-                    // It's a list response
+                    // It's a list response (Databases)
                     data.documents = cleanDocuments(data.documents);
-                } else {
+                } else if (Array.isArray(data.rows)) {
+                    // It's a list response (TablesDB)
+                    data.rows = cleanDocuments(data.rows);
+                } else if (data.$id) {
                     // It's likely a single resource
                     data = cleanDocument(data);
                 }

@@ -1,4 +1,4 @@
-import { databases, dbId, adsCollectionId, residentialsCollectionId } from "@/lib/appwrite-server";
+import { tablesDB, dbId, adsTableId, residentialsTableId } from "@/lib/appwrite-server";
 import { unstable_cache } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -7,7 +7,11 @@ import { redirect } from 'next/navigation';
 const getAd = unstable_cache(
     async (adId) => {
         try {
-            return await databases.getDocument(dbId, adsCollectionId, adId);
+            return await tablesDB.getRow({
+                databaseId: dbId,
+                tableId: adsTableId,
+                rowId: adId
+            });
         } catch (error) {
             console.error("Error fetching ad for metadata:", error);
             return null;
@@ -22,7 +26,11 @@ const getAd = unstable_cache(
 const getResidential = unstable_cache(
     async (resId) => {
         try {
-            return await databases.getDocument(dbId, residentialsCollectionId, resId);
+            return await tablesDB.getRow({
+                databaseId: dbId,
+                tableId: residentialsTableId,
+                rowId: resId
+            });
         } catch (error) {
             console.error("Error fetching residential for metadata:", error);
             return null;

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { databases, dbId, adsCollectionId } from '@/lib/appwrite-server';
+import { tablesDB, dbId, adsTableId } from '@/lib/appwrite-server';
 import { Query, ID } from 'node-appwrite';
 import { cleanDocuments } from '@/lib/response-cleaner';
 import { cookies } from 'next/headers';
@@ -110,13 +110,11 @@ export async function GET(request) {
             queries.push(Query.orderDesc(sort));
         }
 
-        const response = await databases.listDocuments(
-            dbId,
-            adsCollectionId || 'anuncios',
-            queries
-        );
+        const response = await tablesDB.listRows({
+            databaseId: dbId, tableId: adsTableId || 'anuncios', queries: queries
+        });
 
-        let cleanedDocuments = cleanDocuments(response.documents);
+        let cleanedDocuments = cleanDocuments(response.rows);
 
         // Filtrar por búsqueda en múltiples campos (título, categoría, teléfono)
         if (searchQuery) {
@@ -159,12 +157,9 @@ export async function POST(request) {
         const body = await request.json();
 
         // Create document using server SDK with API key (bypasses permissions)
-        const newDoc = await databases.createDocument(
-            dbId,
-            adsCollectionId || 'anuncios',
-            ID.unique(),
-            body
-        );
+        const newDoc = await tablesDB.createRow({
+            databaseId: dbId, tableId: adsTableId || 'anuncios', rowId: ID.unique(), data: body
+        });
 
         return NextResponse.json(newDoc, { status: 201 });
     } catch (error) {
