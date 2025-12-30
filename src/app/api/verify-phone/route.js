@@ -60,7 +60,7 @@ export async function POST(request) {
                 const checkResponse = await fetch(residentialApiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, residential_id })
+                    body: JSON.stringify({ phone: phone.replace(/[\+\s]/g, '').trim(), residential_id })
                 });
 
                 if (checkResponse.status === 404) {
@@ -85,7 +85,7 @@ export async function POST(request) {
                 // (Aunque usualmente este caso es solo para checar acceso, si devuelve success podemos dar secret)
                 if (data.status === 'success') {
                     try {
-                        let userId = phone.replace(/\+/g, '');
+                        let userId = phone.replace(/[\+\s]/g, '').trim();
                         if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
                             userId = '521' + userId.substring(2);
                         }
@@ -105,7 +105,7 @@ export async function POST(request) {
         }
 
         // CASO 2: Flujo OTP (envío de SMS)
-        if (!checkRateLimit(ip, phone)) {
+        if (!checkRateLimit(ip, phone.replace(/[\+\s]/g, '').trim())) {
             return NextResponse.json(
                 { error: "Demasiados intentos. Por favor espera un minuto antes de intentar nuevamente." },
                 { status: 429 }
@@ -119,7 +119,7 @@ export async function POST(request) {
         }
 
         const payload = {
-            phone,
+            phone: phone.replace(/[\+\s]/g, '').trim(),
             residential_id: residential_id,
             action,
             name,
@@ -139,7 +139,7 @@ export async function POST(request) {
                     const checkResponse = await fetch(residentialApiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ phone, residential_id })
+                        body: JSON.stringify({ phone: phone.replace(/[\+\s]/g, '').trim(), residential_id })
                     });
 
                     if (checkResponse.status === 404) {
@@ -173,7 +173,7 @@ export async function POST(request) {
         if (action === 'verify' && data.status === 'success') {
             try {
                 // Eliminar el signo + y manejar el prefijo 521 para IDs de Appwrite
-                let userId = phone.replace(/\+/g, '');
+                let userId = phone.replace(/[\+\s]/g, '').trim();
 
                 if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
                     userId = '521' + userId.substring(2);

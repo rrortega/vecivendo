@@ -24,6 +24,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
     const productCacheRef = useRef(new Map());
     const fetchingRef = useRef(false); // Prevent duplicate fetches
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [imageErrors, setImageErrors] = useState(new Set()); // Track failed images
 
     // Embedded Ads State
     const [embeddedAds, setEmbeddedAds] = useState([]);
@@ -445,15 +446,27 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                     {(() => {
                                         const images = product.imagenes || [];
                                         const firstImage = Array.isArray(images) ? images[0] : null;
-                                        return firstImage ? (
+                                        const hasError = imageErrors.has(product.$id);
+
+                                        return firstImage && !hasError ? (
                                             <img
                                                 src={firstImage}
                                                 alt={product.titulo}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 block"
+                                                onError={() => {
+                                                    setImageErrors(prev => new Set([...prev, product.$id]));
+                                                }}
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-text-secondary">
-                                                <ImageOff size={24} className="opacity-50" />
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 relative">
+                                                <ImageOff size={48} className="opacity-20 text-gray-400" />
+                                                {hasError && (
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <span className="bg-red-500/10 backdrop-blur-sm text-red-600 dark:text-red-400 text-xs font-medium px-3 py-1.5 rounded-lg border border-red-500/20 shadow-sm">
+                                                            Imagen eliminada por el anunciante
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })()}

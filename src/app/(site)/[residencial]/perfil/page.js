@@ -567,27 +567,27 @@ export default function ProfilePage({ params }) {
                         {/* Phone Input */}
                         <div>
                             <label className="block text-sm font-medium text-text-secondary mb-1">Celular</label>
-                            <div className="flex gap-2 items-start">
-                                <div className="flex items-center gap-2 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-secondary select-none shrink-0">
-                                    {residentialsMetadata?.country ? (
-                                        <img
-                                            src={`https://flagcdn.com/${residentialsMetadata?.country?.toLowerCase()}.svg`}
-                                            alt={residentialsMetadata?.country}
-                                            className="w-5 h-4 object-cover rounded-sm shadow-sm opacity-80"
-                                        />
-                                    ) : (
-                                        <Megaphone className="w-5 h-5 text-primary" />
-                                    )}
-                                    <span>+{residentialsMetadata?.phone_prefix || '52'}</span>
-                                </div>
-                                {userProfile.telefono_verificado ? (
-                                    <div className="flex items-center w-full bg-green-50/50 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
-                                        <Check className="text-green-500 mr-2" size={18} />
-                                        <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || userProfile.telefono}</span>
-                                        <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2">Verificado</span>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex gap-2 items-start">
+                                    <div className="flex items-center gap-2 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-secondary select-none shrink-0">
+                                        {residentialsMetadata?.country ? (
+                                            <img
+                                                src={`https://flagcdn.com/${residentialsMetadata?.country?.toLowerCase()}.svg`}
+                                                alt={residentialsMetadata?.country}
+                                                className="w-5 h-4 object-cover rounded-sm shadow-sm opacity-80"
+                                            />
+                                        ) : (
+                                            <Megaphone className="w-5 h-5 text-primary" />
+                                        )}
+                                        <span>+{residentialsMetadata?.phone_prefix || '52'}</span>
                                     </div>
-                                ) : (
-                                    <div className="flex flex-col md:flex-row flex-1 min-w-0 gap-2 md:gap-0">
+                                    {userProfile.telefono_verificado ? (
+                                        <div className="flex items-center w-full bg-green-50/50 border border-green-200 rounded-lg px-3 py-2 text-text-main h-11 animate-in fade-in">
+                                            <Check className="text-green-500 mr-2" size={18} />
+                                            <span className="text-text-main font-medium select-all flex-1">{userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || userProfile.telefono}</span>
+                                            <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-200 font-bold ml-2">Verificado</span>
+                                        </div>
+                                    ) : (
                                         <input
                                             type="tel"
                                             value={userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || ''}
@@ -595,28 +595,28 @@ export default function ProfilePage({ params }) {
                                                 const val = e.target.value.replace(/\D/g, '');
                                                 handleUpdateProfile({ telefono: val, telefono_verificado: false });
                                             }}
-                                            className={`flex-1 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none ${(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 ? 'rounded-r-lg' : ''} min-w-0`}
+                                            className="flex-1 bg-surface border border-gray-300 rounded-lg px-3 py-2 text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none min-w-0"
                                             placeholder="Número celular"
                                         />
-                                        {(userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleSendCode}
-                                                disabled={!userProfile.telefono || isVerifying}
-                                                className="w-full md:w-12 flex items-center justify-center transition-colors border border-primary/30 rounded-lg md:rounded-lg ml-2 bg-surface hover:border-primary min-w-[70px] max-h-[42px] py-0"
-                                                title="Verificar número"
-                                            >
-                                                {isVerifying ? (
-                                                    <Loader2 className="animate-spin text-primary" size={20} />
-                                                ) : (
-                                                    <>
-                                                        <Check className="text-primary" size={20} />
-                                                        <span className="md:hidden ml-2 font-medium text-primary">Validar celular</span>
-                                                    </>
-                                                )}
-                                            </Button>
+                                    )}
+                                </div>
+                                {!userProfile.telefono_verificado && (userProfile.telefono?.replace(/^(\+?52|\+?1)/, '') || '').length >= 9 && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleSendCode}
+                                        disabled={!userProfile.telefono || isVerifying}
+                                        className="w-full flex items-center justify-center transition-colors border border-primary/30 rounded-lg bg-surface hover:border-primary h-[42px] px-4"
+                                        title="Verificar número"
+                                    >
+                                        {isVerifying ? (
+                                            <Loader2 className="animate-spin text-primary" size={20} />
+                                        ) : (
+                                            <>
+                                                <Check className="text-primary" size={20} />
+                                                <span className="ml-2 font-medium text-primary">Validar celular</span>
+                                            </>
                                         )}
-                                    </div>
+                                    </Button>
                                 )}
                             </div>
 

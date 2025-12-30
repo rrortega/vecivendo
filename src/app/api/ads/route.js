@@ -77,10 +77,8 @@ export async function GET(request) {
             queries.push(Query.equal("categoria", categoria));
         }
 
-        // Filtro por búsqueda en título
-        if (searchQuery) {
-            queries.push(Query.search("titulo", searchQuery));
-        }
+        // NO agregamos Query.search aquí porque solo permite buscar en un campo
+        // En su lugar, filtraremos después de obtener los resultados
 
         // Filtro por fecha específica
         if (dateFilter) {
@@ -118,11 +116,26 @@ export async function GET(request) {
             queries
         );
 
-        const cleanedDocuments = cleanDocuments(response.documents);
+        let cleanedDocuments = cleanDocuments(response.documents);
+
+        // Filtrar por búsqueda en múltiples campos (título, categoría, teléfono)
+        if (searchQuery) {
+            const searchLower = searchQuery.toLowerCase();
+            cleanedDocuments = cleanedDocuments.filter(ad => {
+                const titulo = (ad.titulo || '').toLowerCase();
+                const categoria = (ad.categoria || '').toLowerCase();
+                const telefono = (ad.celular_anunciante || '').replace(/[\s\-\(\)]/g, '');
+                const searchNormalized = searchQuery.replace(/[\s\-\(\)]/g, '');
+
+                return titulo.includes(searchLower) ||
+                    categoria.includes(searchLower) ||
+                    telefono.includes(searchNormalized);
+            });
+        }
 
         return NextResponse.json({
             documents: cleanedDocuments,
-            total: response.total
+            total: searchQuery ? cleanedDocuments.length : response.total
         }, {
             headers: {
                 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',

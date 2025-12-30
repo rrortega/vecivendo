@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Lock, Smartphone, X, Loader2, CheckCircle, Navigation, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -30,6 +30,9 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [timeLeft, setTimeLeft] = useState(0);
     const [verificationStatus, setVerificationStatus] = useState('idle'); // idle | searching | found
+    const [redirectCountdown, setRedirectCountdown] = useState(0); // Countdown para redirección
+    const isModalOpenRef = useRef(false); // Rastrear si el modal está abierto
+    const countdownIntervalRef = useRef(null); // Rastrear el intervalo del countdown
 
     useEffect(() => {
         if (timeLeft > 0) {
@@ -49,6 +52,25 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
+            isModalOpenRef.current = true; // Marcar modal como abierto
+            // Reiniciar todos los estados cuando el modal se abre
+            setStep("intro");
+            setUserLocation(null);
+            setError(null);
+            setPhone("");
+            setCountryCode("+52");
+            setOtp("");
+            setIsLoading(false);
+            setTimeLeft(0);
+            setVerificationStatus('idle');
+            setRedirectCountdown(0);
+        } else {
+            isModalOpenRef.current = false; // Marcar modal como cerrado
+            // Limpiar intervalo si existe
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+            }
         }
         return () => {
             document.body.style.overflow = 'unset';
@@ -118,9 +140,23 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
                         const updatedAccess = grantedAccess.filter(r => r.slug !== residential.slug);
                         localStorage.setItem("granted_access", JSON.stringify([...updatedAccess, newRecord]));
 
+                        // Iniciar countdown de 3 segundos
+                        setRedirectCountdown(3);
+                        let countdown = 3;
+                        const countdownInterval = setInterval(() => {
+                            countdown -= 1;
+                            setRedirectCountdown(countdown);
+                            if (countdown <= 0) {
+                                clearInterval(countdownInterval);
+                            }
+                        }, 1000);
+
                         setTimeout(() => {
-                            router.push(`/${residential.slug}`);
-                        }, 2000);
+                            // Solo redirigir si el modal sigue abierto
+                            if (isModalOpenRef.current) {
+                                router.push(`/${residential.slug}`);
+                            }
+                        }, 3000);
                     } else {
                         setStep("denied");
                     }
@@ -164,12 +200,18 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
                         setTimeLeft((prev) => {
                             if (prev <= 1000) {
                                 clearInterval(interval);
-                                saveAccess(residential.id);
+                                // Solo ejecutar saveAccess si el modal sigue abierto
+                                if (isModalOpenRef.current) {
+                                    saveAccess(residential.id);
+                                }
                                 return 0;
                             }
                             return prev - 1000;
                         });
                     }, 1000);
+
+                    // Guardar referencia del intervalo para limpiarlo si se cierra el modal
+                    countdownIntervalRef.current = interval;
                 } else {
                     setVerificationStatus('idle');
                     setError(data.error || "No pudimos validar tu acceso en el grupo.");
@@ -296,7 +338,10 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
         localStorage.setItem("granted_access", JSON.stringify([...updatedAccess, newRecord]));
 
         setTimeout(() => {
-            router.push(`/${residential.slug}`);
+            // Solo redirigir si el modal sigue abierto
+            if (isModalOpenRef.current) {
+                router.push(`/${residential.slug}`);
+            }
         }, 2000);
     };
 
@@ -395,12 +440,23 @@ export const AccessModal = ({ isOpen, onClose, residential }) => {
                                     <motion.div
                                         initial={{ y: 20, opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
-                                        className="bg-green-50/90 backdrop-blur p-3 rounded-xl shadow-lg flex items-center gap-3 text-green-700 border border-green-200"
+                                        className="bg-green-50/90 backdrop-blur rounded-xl shadow-lg text-green-700 border border-green-200 overflow-hidden"
                                     >
-                                        <CheckCircle className="shrink-0" />
-                                        <div>
-                                            <p className="font-bold">¡Ubicación Validada!</p>
-                                            <p className="text-xs">Redirigiendo al marketplace...</p>
+                                        <div className="p-3 flex items-center gap-3">
+                                            <CheckCircle className="shrink-0" />
+                                            <div className="flex-1">
+                                                <p className="font-bold">¡Ubicación Validada!</p>
+                                                <p className="text-xs">Redirigiendo en {redirectCountdown} segundo{redirectCountdown !== 1 ? 's' : ''}...</p>
+                                            </div>
+                                        </div>
+                                        {/* Barra de progreso */}
+                                        <div className="w-full bg-green-200 h-1.5 overflow-hidden">
+                                            <motion.div
+                                                initial={{ width: "0%" }}
+                                                animate={{ width: "100%" }}
+                                                transition={{ duration: 3, ease: "linear" }}
+                                                className="h-full bg-green-600"
+                                            />
                                         </div>
                                     </motion.div>
                                 )}

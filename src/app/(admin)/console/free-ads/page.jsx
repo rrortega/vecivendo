@@ -393,6 +393,7 @@ export default function AdsPage() {
                                     <div className="flex items-center gap-2">Precio / Variantes <SortIcon columnKey="precio" /></div>
                                 </th>
                                 <th className="px-4 py-3">Residencial</th>
+                                <th className="px-4 py-3">Celular</th>
                                 <th className="px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('$createdAt')}>
                                     <div className="flex items-center gap-2">Fecha / Vigencia <SortIcon columnKey="$createdAt" /></div>
                                 </th>
@@ -410,12 +411,13 @@ export default function AdsPage() {
                                         <td className="px-4 py-3"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div></td>
                                         <td className="px-4 py-3"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div></td>
                                         <td className="px-4 py-3"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div></td>
+                                        <td className="px-4 py-3"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div></td>
                                         <td className="px-4 py-3"><div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div></td>
                                     </tr>
                                 ))
                             ) : ads.length === 0 ? (
                                 <tr>
-                                    <td colspan="8" className="px-4 py-12 text-center admin-text-muted">
+                                    <td colspan="9" className="px-4 py-12 text-center admin-text-muted">
                                         <div className="flex flex-col items-center justify-center">
                                             <Search className="text-gray-300 dark:text-gray-600 mb-2" size={32} />
                                             <p>No se encontraron anuncios</p>
@@ -477,6 +479,21 @@ export default function AdsPage() {
                                                 <span className="truncate" title={getResidentialName(ad)}>
                                                     {getResidentialName(ad)}
                                                 </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2 admin-text-muted">
+                                            <div className="flex items-center gap-1.5">
+                                                {ad.celular_anunciante ? (
+                                                    <a
+                                                        href={`tel:${ad.celular_anunciante}`}
+                                                        className="text-xs hover:text-primary transition-colors font-mono"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {ad.celular_anunciante}
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">Sin teléfono</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-4 py-2 admin-text-muted cursor-pointer" onClick={() => router.push(`/console/free-ads/${ad.$id}`)}>
