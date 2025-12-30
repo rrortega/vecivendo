@@ -11,7 +11,8 @@ export default function KPICard({
     icon: Icon,
     format = 'number', // 'number', 'currency', 'percentage'
     currency = 'USD',
-    className = ''
+    className = '',
+    isLoading = false
 }) {
     const getTrendIcon = () => {
         if (!change) return <Minus className="w-3 h-3" />;
@@ -52,6 +53,21 @@ export default function KPICard({
                 return formatNumber(val);
         }
     };
+
+    if (isLoading) {
+        return (
+            <div className={`bg-surface rounded-2xl shadow-sm border border-gray-900/10 p-6 animate-pulse ${className}`}>
+                <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-xl w-12 h-12" />
+                    <div className="h-6 w-16 bg-gray-100 dark:bg-gray-800 rounded-full" />
+                </div>
+                <div>
+                    <div className="h-4 w-24 bg-gray-100 dark:bg-gray-800 rounded mb-2" />
+                    <div className="h-8 w-32 bg-gray-100 dark:bg-gray-800 rounded" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`bg-surface rounded-2xl shadow-sm border border-gray-900/20 p-6 hover:shadow-md transition-all duration-300 group ${className}`}>

@@ -99,7 +99,7 @@ export default function DashboardPage() {
         return null;
     }, [residentialId, selectedCountry, selectedState, residentials]);
 
-    const { kpis, loading, error } = useDashboardKPIs(
+    const { kpis, loading, loadingSections, error } = useDashboardKPIs(
         startDate || new Date(),
         endDate || new Date(),
         derivedResidentialIds,
@@ -377,223 +377,246 @@ export default function DashboardPage() {
             )}
 
             {/* KPIs Sections */}
-            {kpis && (
-                <>
-                    {/* Sección de Anuncios */}
-                    <KPISection title="Anuncios" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
-                        <KPICard
-                            title="Anuncios Activos"
-                            value={kpis.ads.totalActive}
-                            previousValue={kpis.ads.totalActivePrevious}
-                            change={kpis.ads.totalActiveChange}
-                            icon={Package}
-                        />
-                        <KPICard
-                            title="Anuncios Inactivos"
-                            value={kpis.ads.totalInactive}
-                            previousValue={kpis.ads.totalInactivePrevious}
-                            change={kpis.ads.totalInactiveChange}
-                            icon={Archive}
-                        />
-                        <KPICard
-                            title="Tasa de Crecimiento"
-                            value={kpis.ads.growthRate.percentage}
-                            change={kpis.ads.growthRate}
-                            icon={TrendingUp}
-                            format="percentage"
-                        />
-                        <KPICard
-                            title="Próximos a Vencer"
-                            value={kpis.ads.expiringAds}
-                            icon={Package}
-                        />
-                    </KPISection>
+            <>
+                {/* Sección de Anuncios */}
+                <KPISection title="Anuncios" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
+                    <KPICard
+                        title="Anuncios Activos"
+                        value={kpis?.ads?.totalActive}
+                        previousValue={kpis?.ads?.totalActivePrevious}
+                        change={kpis?.ads?.totalActiveChange}
+                        icon={Package}
+                        isLoading={loadingSections.ads}
+                    />
+                    <KPICard
+                        title="Próximos a Vencer"
+                        value={kpis?.ads?.expiringAds}
+                        icon={Package}
+                        isLoading={loadingSections.ads}
+                    />
+                    <KPICard
+                        title="Anuncios Inactivos"
+                        value={kpis?.ads?.totalInactive}
+                        previousValue={kpis?.ads?.totalInactivePrevious}
+                        change={kpis?.ads?.totalInactiveChange}
+                        icon={Archive}
+                        isLoading={loadingSections.ads}
+                    />
+                    <KPICard
+                        title="Nuevos Anuncios"
+                        value={kpis?.ads?.newAdsCurrentPeriod}
+                        previousValue={kpis?.ads?.newAdsPreviousPeriod}
+                        change={kpis?.ads?.growthRate}
+                        icon={TrendingUp}
+                        isLoading={loadingSections.ads}
+                    />
 
-                    {/* Gráfico de Anuncios por Categoría - Ocultar solo si hay exactamente 1 categoría seleccionada */}
-                    {categoryChartData.length > 0 && selectedCategories.length !== 1 && (
-                        <div className="mb-8">
-                            <ChartWidget
-                                title="Anuncios por Categoría"
-                                data={categoryChartData}
-                                type="pie"
-                                variant="rose"
-                            />
-                        </div>
-                    )}
+                </KPISection>
 
-                    {/* Sección de Engagement */}
-                    <KPISection title="Engagement" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
-                        <KPICard
-                            title="Total de Visualizaciones"
-                            value={kpis.engagement.totalViews}
-                            previousValue={kpis.engagement.totalViewsPrevious}
-                            change={kpis.engagement.totalViewsChange}
-                            icon={Eye}
+                {/* Gráfico de Anuncios por Categoría */}
+                {(categoryChartData.length > 0 || loadingSections.ads || kpis?.ads) && selectedCategories.length !== 1 && (
+                    <div className="mb-8">
+                        <ChartWidget
+                            title="Anuncios por Categoría"
+                            data={categoryChartData}
+                            type="pie"
+                            variant="rose"
+                            isLoading={loadingSections.ads}
                         />
-                        <KPICard
-                            title="Visualizaciones Únicas"
-                            value={kpis.engagement.uniqueViews}
-                            previousValue={kpis.engagement.uniqueViewsPrevious}
-                            change={kpis.engagement.uniqueViewsChange}
-                            icon={Users}
-                        />
-                        <KPICard
-                            title="Total de Clics"
-                            value={kpis.engagement.totalClicks}
-                            previousValue={kpis.engagement.totalClicksPrevious}
-                            change={kpis.engagement.totalClicksChange}
-                            icon={MousePointerClick}
-                        />
-                        <KPICard
-                            title="CTR (Tasa de Clics)"
-                            value={kpis.engagement.ctr}
-                            previousValue={kpis.engagement.ctrPrevious}
-                            change={kpis.engagement.ctrChange}
-                            icon={TrendingUp}
-                            format="percentage"
-                        />
-                    </KPISection>
+                    </div>
+                )}
 
-                    {/* Gráfico de Engagement por Dispositivo */}
-                    {deviceChartData.length > 0 && (
-                        <div className="mb-8">
-                            <ChartWidget
-                                title="Engagement por Dispositivo"
-                                data={deviceChartData}
-                                type="pie"
-                            />
-                        </div>
-                    )}
+                {/* Sección de Engagement */}
+                <KPISection title="Engagement" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
+                    <KPICard
+                        title="Total de Visualizaciones"
+                        value={kpis?.engagement?.totalViews}
+                        previousValue={kpis?.engagement?.totalViewsPrevious}
+                        change={kpis?.engagement?.totalViewsChange}
+                        icon={Eye}
+                        isLoading={loadingSections.engagement}
+                    />
+                    <KPICard
+                        title="Visualizaciones Únicas"
+                        value={kpis?.engagement?.uniqueViews}
+                        previousValue={kpis?.engagement?.uniqueViewsPrevious}
+                        change={kpis?.engagement?.uniqueViewsChange}
+                        icon={Users}
+                        isLoading={loadingSections.engagement}
+                    />
+                    <KPICard
+                        title="Total de Clics"
+                        value={kpis?.engagement?.totalClicks}
+                        previousValue={kpis?.engagement?.totalClicksPrevious}
+                        change={kpis?.engagement?.totalClicksChange}
+                        icon={MousePointerClick}
+                        isLoading={loadingSections.engagement}
+                    />
+                    <KPICard
+                        title="CTR (Tasa de Clics)"
+                        value={kpis?.engagement?.ctr}
+                        previousValue={kpis?.engagement?.ctrPrevious}
+                        change={kpis?.engagement?.ctrChange}
+                        icon={TrendingUp}
+                        format="percentage"
+                        isLoading={loadingSections.engagement}
+                    />
+                </KPISection>
 
-                    {/* Sección de Pedidos */}
-                    <KPISection title="Pedidos" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
-                        <KPICard
-                            title="Total de Pedidos"
-                            value={kpis.orders.totalOrders}
-                            previousValue={kpis.orders.totalOrdersPrevious}
-                            change={kpis.orders.totalOrdersChange}
-                            icon={ShoppingCart}
+                {/* Gráfico de Engagement por Dispositivo */}
+                {(deviceChartData.length > 0 || loadingSections.engagement || kpis?.engagement) && (
+                    <div className="mb-8">
+                        <ChartWidget
+                            title="Engagement por Dispositivo"
+                            data={deviceChartData}
+                            type="pie"
+                            isLoading={loadingSections.engagement}
                         />
-                        <KPICard
-                            title="Valor Total"
-                            value={kpis.orders.totalValue}
-                            previousValue={kpis.orders.totalValuePrevious}
-                            change={kpis.orders.totalValueChange}
-                            icon={DollarSign}
-                            format="currency"
-                        />
-                        <KPICard
-                            title="Ticket Promedio"
-                            value={kpis.orders.avgTicket}
-                            previousValue={kpis.orders.avgTicketPrevious}
-                            change={kpis.orders.avgTicketChange}
-                            icon={Receipt}
-                            format="currency"
-                        />
-                        <KPICard
-                            title="Tasa de Conversión"
-                            value={kpis.orders.conversionRate}
-                            previousValue={kpis.orders.previousConversionRate}
-                            icon={TrendingUp}
-                            format="percentage"
-                        />
-                    </KPISection>
+                    </div>
+                )}
 
-                    {/* Gráfico de Pedidos por Estado */}
-                    {statusChartData.length > 0 && (
-                        <div className="mb-8">
-                            <ChartWidget
-                                title="Pedidos por Estado"
-                                data={statusChartData}
-                                type="bar"
-                            />
-                        </div>
-                    )}
+                {/* Sección de Pedidos */}
+                <KPISection title="Pedidos" gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
+                    <KPICard
+                        title="Total de Pedidos"
+                        value={kpis?.orders?.totalOrders}
+                        previousValue={kpis?.orders?.totalOrdersPrevious}
+                        change={kpis?.orders?.totalOrdersChange}
+                        icon={ShoppingCart}
+                        isLoading={loadingSections.orders}
+                    />
+                    <KPICard
+                        title="Valor Total"
+                        value={kpis?.orders?.totalValue}
+                        previousValue={kpis?.orders?.totalValuePrevious}
+                        change={kpis?.orders?.totalValueChange}
+                        icon={DollarSign}
+                        format="currency"
+                        isLoading={loadingSections.orders}
+                    />
+                    <KPICard
+                        title="Ticket Promedio"
+                        value={kpis?.orders?.avgTicket}
+                        previousValue={kpis?.orders?.avgTicketPrevious}
+                        change={kpis?.orders?.avgTicketChange}
+                        icon={Receipt}
+                        format="currency"
+                        isLoading={loadingSections.orders}
+                    />
+                    <KPICard
+                        title="Tasa de Conversión"
+                        value={kpis?.orders?.conversionRate}
+                        previousValue={kpis?.orders?.previousConversionRate}
+                        icon={TrendingUp}
+                        format="percentage"
+                        isLoading={loadingSections.orders}
+                    />
+                </KPISection>
 
-                    {/* Sección de Usuarios */}
-                    <KPISection title="Usuarios" gridClassName="grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
-                        <KPICard
-                            title="Anunciantes Activos"
-                            value={kpis.users.activeAdvertisers}
-                            previousValue={kpis.users.activeAdvertisersPrevious}
-                            change={kpis.users.activeAdvertisersChange}
-                            icon={Users}
+                {/* Gráfico de Pedidos por Estado */}
+                {(statusChartData.length > 0 || loadingSections.orders || kpis?.orders) && (
+                    <div className="mb-8">
+                        <ChartWidget
+                            title="Pedidos por Estado"
+                            data={statusChartData}
+                            type="bar"
+                            isLoading={loadingSections.orders}
                         />
-                        <KPICard
-                            title="Nuevos Anunciantes"
-                            value={kpis.users.newAdvertisers}
-                            icon={UserPlus}
-                        />
-                    </KPISection>
+                    </div>
+                )}
 
-                    {/* Sección de Publicidad Pagada */}
-                    <KPISection title="Publicidad Pagada" >
-                        <KPICard
-                            title="Anuncios Pagados Activos"
-                            value={kpis.paidAds.activePaidAds}
-                            previousValue={kpis.paidAds.activePaidAdsPrevious}
-                            change={kpis.paidAds.activePaidAdsChange}
-                            icon={Megaphone}
-                        />
-                        <KPICard
-                            title="Impresiones"
-                            value={kpis.paidAds.impressions}
-                            previousValue={kpis.paidAds.impressionsPrevious}
-                            change={kpis.paidAds.impressionsChange}
-                            icon={Eye}
-                        />
-                        <KPICard
-                            title="CTR de Publicidad"
-                            value={kpis.paidAds.ctr}
-                            previousValue={kpis.paidAds.ctrPrevious}
-                            change={kpis.paidAds.ctrChange}
-                            icon={TrendingUp}
-                            format="percentage"
-                        />
-                        <KPICard
-                            title="Tasa de Conversión"
-                            value={kpis.paidAds.conversionRate || 0}
-                            previousValue={kpis.paidAds.conversionRatePrevious || 0}
-                            change={kpis.paidAds.conversionRateChange}
-                            icon={TrendingUp}
-                            format="percentage"
-                        />
-                    </KPISection>
+                {/* Sección de Usuarios */}
+                <KPISection title="Usuarios" gridClassName="grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
+                    <KPICard
+                        title="Anunciantes Activos"
+                        value={kpis?.users?.activeAdvertisers}
+                        previousValue={kpis?.users?.activeAdvertisersPrevious}
+                        change={kpis?.users?.activeAdvertisersChange}
+                        icon={Users}
+                        isLoading={loadingSections.users}
+                    />
+                    <KPICard
+                        title="Nuevos Anunciantes"
+                        value={kpis?.users?.newAdvertisers}
+                        icon={UserPlus}
+                        isLoading={loadingSections.users}
+                    />
+                </KPISection>
 
-                    {/* Sección de Calidad */}
-                    <KPISection title="Calidad" gridClassName="grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
-                        <KPICard
-                            title="Total de Reseñas"
-                            value={kpis.quality.totalReviews}
-                            previousValue={kpis.quality.totalReviewsPrevious}
-                            change={kpis.quality.totalReviewsChange}
-                            icon={Star}
-                        />
-                        <KPICard
-                            title="Calificación Promedio"
-                            value={kpis.quality.avgRating}
-                            previousValue={kpis.quality.avgRatingPrevious}
-                            change={kpis.quality.avgRatingChange}
-                            icon={Star}
-                        />
-                    </KPISection>
+                {/* Sección de Publicidad Pagada */}
+                <KPISection title="Publicidad Pagada" >
+                    <KPICard
+                        title="Anuncios Pagados Activos"
+                        value={kpis?.paidAds?.activePaidAds}
+                        previousValue={kpis?.paidAds?.activePaidAdsPrevious}
+                        change={kpis?.paidAds?.activePaidAdsChange}
+                        icon={Megaphone}
+                        isLoading={loadingSections.paidAds}
+                    />
+                    <KPICard
+                        title="Impresiones"
+                        value={kpis?.paidAds?.impressions}
+                        previousValue={kpis?.paidAds?.impressionsPrevious}
+                        change={kpis?.paidAds?.impressionsChange}
+                        icon={Eye}
+                        isLoading={loadingSections.paidAds}
+                    />
+                    <KPICard
+                        title="CTR de Publicidad"
+                        value={kpis?.paidAds?.ctr}
+                        previousValue={kpis?.paidAds?.ctrPrevious}
+                        change={kpis?.paidAds?.ctrChange}
+                        icon={TrendingUp}
+                        format="percentage"
+                        isLoading={loadingSections.paidAds}
+                    />
+                    <KPICard
+                        title="Tasa de Conversión"
+                        value={kpis?.paidAds?.conversionRate || 0}
+                        previousValue={kpis?.paidAds?.conversionRatePrevious || 0}
+                        change={kpis?.paidAds?.conversionRateChange}
+                        icon={TrendingUp}
+                        format="percentage"
+                        isLoading={loadingSections.paidAds}
+                    />
+                </KPISection>
 
-                    {/* Gráfico de Distribución de Calificaciones */}
-                    {ratingChartData.length > 0 && (
-                        <div className="mb-8">
-                            <ChartWidget
-                                title="Distribución de Calificaciones"
-                                data={ratingChartData}
-                                type="bar"
-                            />
-                        </div>
-                    )}
-                </>
-            )}
+                {/* Sección de Calidad */}
+                <KPISection title="Calidad" gridClassName="grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
+                    <KPICard
+                        title="Total de Reseñas"
+                        value={kpis?.quality?.totalReviews}
+                        previousValue={kpis?.quality?.totalReviewsPrevious}
+                        change={kpis?.quality?.totalReviewsChange}
+                        icon={Star}
+                        isLoading={loadingSections.quality}
+                    />
+                    <KPICard
+                        title="Calificación Promedio"
+                        value={kpis?.quality?.avgRating}
+                        previousValue={kpis?.quality?.avgRatingPrevious}
+                        change={kpis?.quality?.avgRatingChange}
+                        icon={Star}
+                        isLoading={loadingSections.quality}
+                    />
+                </KPISection>
+
+                {/* Gráfico de Distribución de Calificaciones */}
+                {(ratingChartData.length > 0 || loadingSections.quality || kpis?.quality) && (
+                    <div className="mb-8">
+                        <ChartWidget
+                            title="Distribución de Calificaciones"
+                            data={ratingChartData}
+                            type="bar"
+                            isLoading={loadingSections.quality}
+                        />
+                    </div>
+                )}
+            </>
 
             {/* Indicador de actualización en tiempo real */}
             {kpis && (
-                <div className="mt-8 text-center">
+                <div className="mt-8 text-center pb-12">
                     <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
                         <span className="relative flex h-3 w-3">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>

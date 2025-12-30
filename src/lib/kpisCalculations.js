@@ -60,20 +60,23 @@ export function filterByDateRange(documents, startDate, endDate, dateField = '$c
 
 /**
  * Calcula KPIs de anuncios
- * @param {Array} anuncios - Array de anuncios
- * @param {Array} previousAnuncios - Array de anuncios del período anterior
+ * @param {Array} allAnuncios - Array de todos los anuncios (para métricas de estado)
+ * @param {Array} currentPeriodAnuncios - Array de anuncios creados en el período actual
+ * @param {Array} previousPeriodAnuncios - Array de anuncios creados en el período anterior
  * @param {Object} categoriesMap - Mapa de ID de categoría a Nombre (opcional)
  * @returns {Object} - KPIs de anuncios
  */
-export function calculateAdKPIs(anuncios, previousAnuncios, categoriesMap = {}) {
-    const activeAds = anuncios.filter(ad => ad.activo);
-    const previousActiveAds = previousAnuncios.filter(ad => ad.activo);
+export function calculateAdKPIs(allAnuncios, currentPeriodAnuncios, previousPeriodAnuncios, categoriesMap = {}) {
+    // Métricas de estado basadas en todos los anuncios
+    const activeAds = allAnuncios.filter(ad => ad.activo);
+    const inactiveAds = allAnuncios.filter(ad => !ad.activo);
 
-    const inactiveAds = anuncios.filter(ad => !ad.activo);
-    const previousInactiveAds = previousAnuncios.filter(ad => !ad.activo);
+    // Anuncios activos/inactivos del período actual para comparación
+    const currentActiveAds = currentPeriodAnuncios.filter(ad => ad.activo);
+    const previousActiveAds = previousPeriodAnuncios.filter(ad => ad.activo);
 
-    // Anuncios por categoría
-    const adsByCategory = anuncios.reduce((acc, ad) => {
+    // Anuncios por categoría (basado en todos los anuncios)
+    const adsByCategory = allAnuncios.reduce((acc, ad) => {
         // Try to get category ID: could be a string, or an object if expanded
         let categoryId = null;
         let categoryName = 'Sin categoría';
@@ -102,7 +105,7 @@ export function calculateAdKPIs(anuncios, previousAnuncios, categoriesMap = {}) 
     }, {});
 
     // Anuncios por residencial
-    const adsByResidential = anuncios.reduce((acc, ad) => {
+    const adsByResidential = allAnuncios.reduce((acc, ad) => {
         const residentialId = ad.residencial_id?.$id || ad.residencial_id || 'Sin residencial';
         acc[residentialId] = (acc[residentialId] || 0) + 1;
         return acc;
@@ -111,23 +114,30 @@ export function calculateAdKPIs(anuncios, previousAnuncios, categoriesMap = {}) 
     // Anuncios próximos a vencer (7 días)
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const expiringAds = anuncios.filter(ad => {
+    const expiringAds = allAnuncios.filter(ad => {
         if (!ad.$updatedAt || !ad.dias_vigencia) return false;
         const updatedDate = new Date(ad.$updatedAt);
         const expiryDate = new Date(updatedDate.getTime() + ad.dias_vigencia * 24 * 60 * 60 * 1000);
         return expiryDate >= now && expiryDate <= sevenDaysFromNow;
     });
 
+    // Tasa de crecimiento: comparación de anuncios nuevos entre períodos
+    const newAdsCurrentPeriod = currentPeriodAnuncios.length;
+    const newAdsPreviousPeriod = previousPeriodAnuncios.length;
+
     return {
         totalActive: activeAds.length,
         totalActivePrevious: previousActiveAds.length,
-        totalActiveChange: calculateChange(activeAds.length, previousActiveAds.length),
+        totalActiveChange: calculateChange(currentActiveAds.length, previousActiveAds.length),
         totalInactive: inactiveAds.length,
-        totalInactiveChange: calculateChange(inactiveAds.length, previousInactiveAds.length),
+        totalInactiveChange: calculateChange(inactiveAds.length, 0), // Inactivos no tienen comparación temporal directa
         adsByCategory,
         adsByResidential,
         expiringAds: expiringAds.length,
-        growthRate: calculateChange(anuncios.length, previousAnuncios.length)
+        // Tasa de crecimiento: cuántos anuncios nuevos hay en el período actual vs anterior
+        newAdsCurrentPeriod,
+        newAdsPreviousPeriod,
+        growthRate: calculateChange(newAdsCurrentPeriod, newAdsPreviousPeriod)
     };
 }
 

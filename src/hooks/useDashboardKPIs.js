@@ -6,6 +6,7 @@ const DB_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || 'vecivendo-db';
 export function useDashboardKPIs(startDate, endDate, residentialIds = null, categories = []) {
     const [kpis, setKpis] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [loadingSections, setLoadingSections] = useState({});
     const [error, setError] = useState(null);
 
     const fetchKPIs = useCallback(async () => {
@@ -15,27 +16,47 @@ export function useDashboardKPIs(startDate, endDate, residentialIds = null, cate
             setLoading(true);
             setError(null);
 
-            const url = new URL('/api/dashboard/stats', window.location.origin);
-            url.searchParams.append('startDate', startDate.toISOString());
-            url.searchParams.append('endDate', endDate.toISOString());
+            const sections = ['ads', 'orders', 'engagement', 'paidAds', 'quality', 'users'];
+
+            // Inicializar todas las secciones como cargando
+            const initialLoading = {};
+            sections.forEach(s => initialLoading[s] = true);
+            setLoadingSections(initialLoading);
+
+            const baseParams = new URLSearchParams();
+            baseParams.append('startDate', startDate.toISOString());
+            baseParams.append('endDate', endDate.toISOString());
 
             if (residentialIds && residentialIds.length > 0) {
-                url.searchParams.append('residentialIds', residentialIds.join(','));
+                baseParams.append('residentialIds', residentialIds.join(','));
             }
 
             if (categories && categories.length > 0) {
-                url.searchParams.append('categories', categories.join(','));
+                baseParams.append('categories', categories.join(','));
             }
 
-            const response = await fetch(url.toString());
+            // Función para cargar una sección específica y mezclarla en el estado
+            const fetchSection = async (section) => {
+                try {
+                    const url = `/api/dashboard/stats?${baseParams.toString()}&section=${section}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Error en sección ${section}`);
+                    const data = await response.json();
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `Request failed: ${response.status}`);
-            }
+                    setKpis(prev => ({
+                        ...(prev || {}),
+                        ...data
+                    }));
+                } finally {
+                    setLoadingSections(prev => ({
+                        ...prev,
+                        [section]: false
+                    }));
+                }
+            };
 
-            const data = await response.json();
-            setKpis(data);
+            // Ejecutar todas las peticiones en paralelo
+            await Promise.allSettled(sections.map(s => fetchSection(s)));
 
         } catch (err) {
             console.error('Error fetching dashboard KPIs:', err);
@@ -70,5 +91,5 @@ export function useDashboardKPIs(startDate, endDate, residentialIds = null, cate
         };
     }, [fetchKPIs]);
 
-    return { kpis, loading, error, refresh: fetchKPIs };
+    return { kpis, loading, loadingSections, error, refresh: fetchKPIs };
 }

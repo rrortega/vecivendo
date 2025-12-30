@@ -66,7 +66,18 @@ const renderRoseShape = (props, maxValue) => {
     );
 };
 
-export default function ChartWidget({ title, data, type = 'bar', variant = 'default', dataKey = 'value', nameKey = 'name' }) {
+export default function ChartWidget({ title, data, type = 'bar', variant = 'default', dataKey = 'value', nameKey = 'name', isLoading = false }) {
+    if (isLoading) {
+        return (
+            <div className="bg-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 flex flex-col h-[430px] animate-pulse">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="h-6 w-48 bg-gray-100 dark:bg-gray-800 rounded" />
+                </div>
+                <div className="flex-1 w-full bg-gray-50/50 dark:bg-gray-800/30 rounded-xl" />
+            </div>
+        );
+    }
+
     if (!data || data.length === 0) {
         return (
             <div className="bg-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 flex flex-col items-center justify-center h-[400px]">
@@ -92,7 +103,7 @@ export default function ChartWidget({ title, data, type = 'bar', variant = 'defa
                     <div className="flex flex-col md:flex-row items-center justify-between w-full h-[350px]">
                         {/* Custom Legend - Left (First Half) */}
                         {variant === 'rose' && (
-                            <div className="hidden md:flex flex-col gap-2 w-1/4 h-full justify-center overflow-auto pr-2">
+                            <div className="hidden md:flex flex-col gap-2 w-1/4 h-full justify-center overflow-auto pr-2 custom-scrollbar">
                                 {data.slice(0, Math.ceil(data.length / 2)).map((entry, index) => (
                                     <div key={`legend-left-${index}`} className="flex items-center gap-2 text-sm justify-start">
                                         <div
@@ -156,7 +167,7 @@ export default function ChartWidget({ title, data, type = 'bar', variant = 'defa
 
                         {/* Custom Legend - Right (Second Half) */}
                         {variant === 'rose' && (
-                            <div className="hidden md:flex flex-col gap-2 w-1/4 h-full justify-center overflow-auto pl-2">
+                            <div className="hidden md:flex flex-col gap-2 w-1/4 h-full justify-center overflow-auto pl-2 custom-scrollbar">
                                 {data.slice(Math.ceil(data.length / 2)).map((entry, index) => {
                                     const realIndex = index + Math.ceil(data.length / 2);
                                     return (
@@ -180,14 +191,14 @@ export default function ChartWidget({ title, data, type = 'bar', variant = 'defa
             case 'bar':
             default:
                 return (
-                    <ResponsiveContainer width="100%" height={350}>
+                    <ResponsiveContainer width="100%" height={420}>
                         <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" className="dark:stroke-gray-700" />
                             <XAxis
                                 dataKey={nameKey}
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 500 }}
+                                tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 500 }}
                                 dy={10}
                             />
                             <YAxis

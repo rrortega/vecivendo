@@ -16,7 +16,7 @@ export const storage = new Storage(client);
 export const users = new Users(client);
 
 // IDs de base de datos y colecciones/tablas
-export const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || 'vecivendo-db';
+export const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || '68fb1bda0004ab49dbd3';
 export const adsCollectionId = 'anuncios';
 export const adsTableId = 'anuncios'; // Alias para TablesDB
 export const residentialsCollectionId = 'residenciales';
