@@ -5,6 +5,8 @@ import { ToastProvider } from "@/context/ToastContext";
 import { CartProvider } from "@/context/CartContext";
 import { ConnectionProvider } from "@/context/ConnectionContext";
 import { OfflineNotification } from "@/components/ui/OfflineNotification";
+import { UpdatePrompt } from "@/components/ui/UpdatePrompt";
+import { AutoPushSubscribe } from "@/components/ui/AutoPushSubscribe";
 
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -56,7 +58,7 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#FD366E",
+  themeColor: "#fd335b",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -155,6 +157,8 @@ export default async function RootLayout({ children }) {
             <CartProvider>
               <ConnectionProvider>
                 <OfflineNotification />
+                <UpdatePrompt />
+                <AutoPushSubscribe />
                 {children}
               </ConnectionProvider>
             </CartProvider>
