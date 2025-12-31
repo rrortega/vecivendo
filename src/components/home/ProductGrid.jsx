@@ -461,7 +461,7 @@ export const ProductGrid = ({ currency = "MXN", residentialSlug, residentialId: 
                                             <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 relative">
                                                 <ImageOff size={48} className="opacity-20 text-gray-400" />
                                                 {hasError && (
-                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="absolute inset-0 flex items-center justify-center m-2">
                                                         <span className="bg-red-500/10 backdrop-blur-sm text-red-600 dark:text-red-400 text-xs font-medium px-3 py-1.5 rounded-lg border border-red-500/20 shadow-sm">
                                                             Imagen eliminada por el anunciante
                                                         </span>
