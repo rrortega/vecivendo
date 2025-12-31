@@ -11,7 +11,7 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Residential ID is required' }, { status: 400 });
         }
 
-        const countApiUrl = process.env.PHONE_RESIDENTIAL_COUNT_API_URL;
+        const countApiUrl = process.env.PHONE_RESIDENTIAL_MEMBERS_API_URL;
 
         if (!countApiUrl) {
             return NextResponse.json({ error: 'Configuration error: Missing Count API URL' }, { status: 500 });
@@ -33,7 +33,7 @@ export async function GET(request) {
 
         // Ensure we return a consistent format
         return NextResponse.json({
-            count: data.total || data.count || 0
+            count: data.total
         });
 
     } catch (error) {
