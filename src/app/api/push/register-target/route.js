@@ -20,20 +20,18 @@ const messaging = new Messaging(client);
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { userId, phone, token } = body;
+        let { userId, phone, token } = body;
 
-        if (!userId) {
+        if (!phone) {
             return NextResponse.json(
-                { error: 'Se requiere userId' },
+                { error: 'Se requiere phone' },
                 { status: 400 }
             );
         }
 
-        if (!phone) {
-            return NextResponse.json(
-                { error: 'Se requiere phone para generar el providerId' },
-                { status: 400 }
-            );
+        // Si no hay userId, lo derivamos del teléfono (teléfono sin +)
+        if (!userId) {
+            userId = phone.replace(/\D/g, '');
         }
 
         if (!token) {

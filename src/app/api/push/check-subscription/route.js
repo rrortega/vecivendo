@@ -18,7 +18,7 @@ const users = new Users(client);
 export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
+        let userId = searchParams.get('userId');
         const phone = searchParams.get('phone');
 
         if (!userId && !phone) {
@@ -28,9 +28,14 @@ export async function GET(request) {
             );
         }
 
+        // Si no hay userId pero hay teléfono, lo derivamos
+        if (!userId && phone) {
+            userId = phone.replace(/\D/g, '');
+        }
+
         // Construir el providerId esperado: teléfono + "PUSH"
         // Limpiamos el teléfono para que solo tenga números
-        const cleanPhone = phone ? phone.replace(/\D/g, '') : null;
+        const cleanPhone = phone ? phone.replace(/\D/g, '') : (userId ? userId : null);
         const expectedProviderId = cleanPhone ? `${cleanPhone}PUSH` : null;
 
         // Si tenemos userId, intentamos buscar los targets del usuario

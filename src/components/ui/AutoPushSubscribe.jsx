@@ -79,10 +79,17 @@ export const AutoPushSubscribe = () => {
             if (!globalProfileData) return null;
 
             const userData = JSON.parse(globalProfileData);
+
+            // El userId es el telefono sin el signo + (según requerimiento)
+            let userId = userData.userId;
+            if (!userId && userData.telefono) {
+                userId = userData.telefono.replace(/\D/g, '');
+            }
+
             return {
                 telefono: userData.telefono,
                 telefono_verificado: userData.telefono_verificado,
-                userId: userData.userId
+                userId: userId
             };
         } catch (e) {
             console.error('[AutoPush] Error parsing user data:', e);
