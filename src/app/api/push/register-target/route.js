@@ -96,21 +96,31 @@ export async function POST(request) {
             const isUserNotFoundError = appwriteError.message?.includes('User with the requested ID could not be found') || appwriteError.code === 404;
 
             if (isUserNotFoundError) {
-                console.log('[RegisterTarget] Usuario no encontrado, intentando con variante de ID...');
+                console.log('[RegisterTarget] Usuario no encontrado, intentando con variante de ID genérica...');
+
+                // Lista de códigos de país (CC) comunes
+                const countryCodes = ['52', '1', '34', '54', '55', '57', '51', '56', '58', '502', '503', '504', '505', '506', '507', '591', '593', '595', '598'];
 
                 let altUserId = null;
-                // Si es México (52) y no tiene el 1, intentamos ponérselo (521)
-                if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
-                    altUserId = '521' + userId.substring(2);
-                }
-                // Al revés: si trae el 1 pero no existe, intentar sin el 1
-                else if (userId.startsWith('521') && userId.length === 13) {
-                    altUserId = '52' + userId.substring(3);
+                // Buscar el CC que coincida al inicio (ordenar por longitud descendente para evitar falsos positivos)
+                for (const cc of countryCodes.sort((a, b) => b.length - a.length)) {
+                    if (userId.startsWith(cc)) {
+                        const rest = userId.substring(cc.length);
+                        // Si después del CC ya hay un '1', probamos a quitárselo
+                        if (rest.startsWith('1')) {
+                            altUserId = cc + rest.substring(1);
+                        }
+                        // Si no hay un '1', probamos a insertárselo
+                        else {
+                            altUserId = cc + '1' + rest;
+                        }
+                        break;
+                    }
                 }
 
                 if (altUserId && altUserId !== userId) {
                     try {
-                        console.log(`[RegisterTarget] Reintentando con ID alternativo: ${altUserId}`);
+                        console.log(`[RegisterTarget] Reintentando con ID alternativo calculado: ${altUserId}`);
                         const result = await performOperation(altUserId);
                         return NextResponse.json({
                             success: true,
@@ -121,7 +131,7 @@ export async function POST(request) {
                             usedAltId: true
                         });
                     } catch (retryError) {
-                        console.error('[RegisterTarget] Error en reintento:', retryError);
+                        console.error('[RegisterTarget] Error en reintento con ID alternativo:', retryError);
                         throw retryError;
                     }
                 }
@@ -213,18 +223,26 @@ export async function DELETE(request) {
             const isUserNotFoundError = error.message?.includes('User with the requested ID could not be found') || error.code === 404;
 
             if (isUserNotFoundError) {
-                console.log('[RegisterTarget] Usuario no encontrado en DELETE, intentando con variante de ID...');
+                console.log('[RegisterTarget] Usuario no encontrado en DELETE, intentando con variante de ID genérica...');
 
+                const countryCodes = ['52', '1', '34', '54', '55', '57', '51', '56', '58', '502', '503', '504', '505', '506', '507', '591', '593', '595', '598'];
                 let altUserId = null;
-                if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
-                    altUserId = '521' + userId.substring(2);
-                } else if (userId.startsWith('521') && userId.length === 13) {
-                    altUserId = '52' + userId.substring(3);
+
+                for (const cc of countryCodes.sort((a, b) => b.length - a.length)) {
+                    if (userId.startsWith(cc)) {
+                        const rest = userId.substring(cc.length);
+                        if (rest.startsWith('1')) {
+                            altUserId = cc + rest.substring(1);
+                        } else {
+                            altUserId = cc + '1' + rest;
+                        }
+                        break;
+                    }
                 }
 
                 if (altUserId && altUserId !== userId) {
                     try {
-                        console.log(`[RegisterTarget] Reintentando DELETE con ID alternativo: ${altUserId}`);
+                        console.log(`[RegisterTarget] Reintentando DELETE con ID alternativo calculado: ${altUserId}`);
                         const deletedId = await performDelete(altUserId);
                         return NextResponse.json({
                             success: true,

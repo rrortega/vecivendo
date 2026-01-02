@@ -71,13 +71,21 @@ export async function GET(request) {
             } catch (error) {
                 const isUserNotFoundError = error.message?.includes('User with the requested ID could not be found') || error.code === 404;
                 if (isUserNotFoundError) {
-                    console.log('[CheckSubscription] Usuario no encontrado, probando variante...');
+                    console.log('[CheckSubscription] Usuario no encontrado, probando variante genérica...');
 
+                    const countryCodes = ['52', '1', '34', '54', '55', '57', '51', '56', '58', '502', '503', '504', '505', '506', '507', '591', '593', '595', '598'];
                     let altUserId = null;
-                    if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
-                        altUserId = '521' + userId.substring(2);
-                    } else if (userId.startsWith('521') && userId.length === 13) {
-                        altUserId = '52' + userId.substring(3);
+
+                    for (const cc of countryCodes.sort((a, b) => b.length - a.length)) {
+                        if (userId.startsWith(cc)) {
+                            const rest = userId.substring(cc.length);
+                            if (rest.startsWith('1')) {
+                                altUserId = cc + rest.substring(1);
+                            } else {
+                                altUserId = cc + '1' + rest;
+                            }
+                            break;
+                        }
                     }
 
                     if (altUserId && altUserId !== userId) {
