@@ -32,17 +32,18 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Se requiere el token FCM' }, { status: 400 });
         }
 
-        // Función para limpiar targets en un usuario específico
+        // Función para limpiar targets expirados en un usuario específico
+        // Solo elimina tokens diferentes al que se está registrando ahora
         const cleanupUserTargets = async (uid) => {
             try {
-                console.log(`[RegisterTarget] Limpiando targets para user: ${uid}`);
+                console.log(`[RegisterTarget] Limpiando targets expirados para user: ${uid}`);
                 const response = await users.listTargets({ userId: uid });
 
-                // Eliminar TODOS los targets de tipo push existentes
-                // Esto asegura que no queden tokens expirados después de reinstalar la app
+                // Eliminar solo los targets con tokens DIFERENTES al actual
+                // Esto permite múltiples dispositivos pero elimina tokens expirados
                 for (const t of response.targets) {
-                    if (t.providerType === 'push') {
-                        console.log(`[RegisterTarget] Eliminando target ${t.$id} (token: ${t.identifier.substring(0, 20)}...)`);
+                    if (t.providerType === 'push' && t.identifier !== token) {
+                        console.log(`[RegisterTarget] Eliminando target expirado ${t.$id} (token: ${t.identifier.substring(0, 20)}...)`);
                         try {
                             await users.deleteTarget({
                                 userId: uid,
@@ -64,34 +65,44 @@ export async function POST(request) {
             const altUserId = currentUserId.startsWith('521') ? '52' + currentUserId.substring(3) :
                 (currentUserId.startsWith('52') && currentUserId.length === 12 ? '521' + currentUserId.substring(2) : null);
 
-            // Limpiar targets en AMBAS variantes para evitar "Ghost Targets"
+            const providerId = 'firebase';
+
+            // Verificar si este token ya existe para este usuario
+            try {
+                const existingTargets = await users.listTargets({ userId: currentUserId });
+                const tokenExists = existingTargets.targets.some(
+                    t => t.providerType === 'push' && t.identifier === token
+                );
+
+                if (tokenExists) {
+                    console.log(`[RegisterTarget] Token ya existe para user ${currentUserId}, no se crea duplicado`);
+                    return {
+                        success: true,
+                        workingUserId: currentUserId,
+                        message: 'Token already registered'
+                    };
+                }
+            } catch (e) {
+                if (e.code !== 404) {
+                    console.warn(`[RegisterTarget] Error verificando targets existentes:`, e.message);
+                }
+            }
+
+            // Limpiar targets antiguos/expirados en AMBAS variantes
             await cleanupUserTargets(currentUserId);
             if (altUserId) await cleanupUserTargets(altUserId);
 
-            const providerId = 'firebase';
-            const targetId = currentUserId;
+            // Crear nuevo target con ID único generado por Appwrite
+            // Esto permite que el mismo usuario tenga múltiples dispositivos
+            const created = await users.createTarget({
+                userId: currentUserId,
+                targetId: ID.unique(), // ID único por dispositivo/instalación
+                providerType: 'push',
+                identifier: token,
+                providerId: providerId
+            });
 
-            try {
-                const created = await users.createTarget({
-                    userId: currentUserId,
-                    targetId: targetId,
-                    providerType: 'push',
-                    identifier: token,
-                    providerId: providerId
-                });
-                return { ...created, workingUserId: currentUserId };
-            } catch (e) {
-                if (e.code === 409) {
-                    const updated = await users.updateTarget({
-                        userId: currentUserId,
-                        targetId: targetId,
-                        identifier: token,
-                        providerId: providerId
-                    });
-                    return { ...updated, workingUserId: currentUserId };
-                }
-                throw e;
-            }
+            return { ...created, workingUserId: currentUserId };
         };
 
         try {
