@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { PushSubscriptionModal } from './PushSubscriptionModal';
 
-// Clave para almacenar la fecha del último decline
-const PUSH_DECLINE_KEY = 'vecivendo_push_decline_timestamp';
-// Tiempo de espera antes de volver a preguntar (48 horas en ms)
-const DECLINE_COOLDOWN_MS = 48 * 60 * 60 * 1000;
+// Clave para almacenar cuándo podemos volver a preguntar
+const PUSH_NEXT_PROMPT_KEY = 'vecivendo_push_next_prompt';
+// Tiempos de espera
+const COOLDOWN_DECLINE_MS = 48 * 60 * 60 * 1000; // 48 horas si declina explícitamente
+const COOLDOWN_CLOSE_MS = 8 * 60 * 60 * 1000;    // 8 horas si solo cierra el modal
 
 /**
  * Componente que gestiona la suscripción automática a push notifications
@@ -20,6 +22,7 @@ const DECLINE_COOLDOWN_MS = 48 * 60 * 60 * 1000;
  * 5. Si acepta, solicita permiso del dispositivo y registra el token
  */
 export const AutoPushSubscribe = () => {
+    const pathname = usePathname();
     const { isSupported, permission, isSubscribed, subscribe, subscription } = usePushNotifications();
 
     const [showModal, setShowModal] = useState(false);
@@ -30,43 +33,48 @@ export const AutoPushSubscribe = () => {
     const hasCheckedRef = useRef(false);
     const userDataRef = useRef(null);
 
+    // Guarda de seguridad: Nunca ejecutar en la consola de administración
+    if (pathname?.startsWith('/console')) {
+        return null;
+    }
+
     /**
-     * Verifica si el usuario ha declinado recientemente
+     * Verifica si debemos mostrar el modal basado en el tiempo de espera
      */
-    const hasDeclinedRecently = useCallback(() => {
+    const isWaitPeriodActive = useCallback(() => {
         try {
-            const declineTimestamp = localStorage.getItem(PUSH_DECLINE_KEY);
-            if (!declineTimestamp) return false;
+            const nextPrompt = localStorage.getItem(PUSH_NEXT_PROMPT_KEY);
+            if (!nextPrompt) return false;
 
-            const declineDate = parseInt(declineTimestamp, 10);
+            const nextPromptDate = parseInt(nextPrompt, 10);
             const now = Date.now();
-            const timeSinceDecline = now - declineDate;
 
-            return timeSinceDecline < DECLINE_COOLDOWN_MS;
+            return now < nextPromptDate;
         } catch {
             return false;
         }
     }, []);
 
     /**
-     * Registra que el usuario ha declinado
+     * Registra el tiempo de espera
      */
-    const markAsDeclined = useCallback(() => {
+    const setNextPromptTime = useCallback((ms) => {
         try {
-            localStorage.setItem(PUSH_DECLINE_KEY, Date.now().toString());
+            const nextTime = Date.now() + ms;
+            localStorage.setItem(PUSH_NEXT_PROMPT_KEY, nextTime.toString());
         } catch (e) {
-            console.error('[AutoPush] Error saving decline timestamp:', e);
+            console.error('[AutoPush] Error saving next prompt timestamp:', e);
         }
     }, []);
 
     /**
-     * Limpia el registro de decline (cuando el usuario acepta)
+     * Limpia el registro de tiempo de espera
      */
-    const clearDecline = useCallback(() => {
+    const clearCooldown = useCallback(() => {
         try {
-            localStorage.removeItem(PUSH_DECLINE_KEY);
+            localStorage.removeItem(PUSH_NEXT_PROMPT_KEY);
         } catch (e) {
-            console.error('[AutoPush] Error clearing decline timestamp:', e);
+            console.error('[AutoPush] Error clearing cooldown:', e);
         }
     }, []);
 
@@ -175,9 +183,9 @@ export const AutoPushSubscribe = () => {
             // Guardar referencia para uso posterior
             userDataRef.current = userData;
 
-            // Si el usuario ha declinado recientemente, no mostrar modal
-            if (hasDeclinedRecently()) {
-                console.log('[AutoPush] Usuario declinó recientemente, esperando 48h');
+            // Si estamos en periodo de espera, no mostrar modal
+            if (isWaitPeriodActive()) {
+                console.log('[AutoPush] Periodo de espera activo, posponiendo verificación');
                 return;
             }
 
@@ -222,7 +230,7 @@ export const AutoPushSubscribe = () => {
         }, 3000); // Esperar 3 segundos después de cargar
 
         return () => clearTimeout(timer);
-    }, [isSupported, isSubscribed, permission, subscription, getUserData, checkPushSubscription, registerPushTarget, hasDeclinedRecently]);
+    }, [isSupported, isSubscribed, permission, subscription, getUserData, checkPushSubscription, registerPushTarget, isWaitPeriodActive]);
 
     /**
      * Maneja cuando el usuario acepta las notificaciones
@@ -254,8 +262,8 @@ export const AutoPushSubscribe = () => {
             // Registrar el target en el servidor
             await registerPushTarget(userData.userId, userData.telefono, token);
 
-            // Limpiar el decline timestamp
-            clearDecline();
+            // Limpiar el cooldown
+            clearCooldown();
 
             console.log('[AutoPush] ¡Suscripción completada exitosamente!');
             setShowModal(false);
@@ -268,19 +276,18 @@ export const AutoPushSubscribe = () => {
         }
     };
 
-    /**
-     * Maneja cuando el usuario declina
-     */
     const handleDecline = () => {
-        console.log('[AutoPush] Usuario declinó, no preguntar por 48h');
-        markAsDeclined();
+        console.log('[AutoPush] Usuario declinó explícitamente, no preguntar por 48h');
+        setNextPromptTime(COOLDOWN_DECLINE_MS);
         setShowModal(false);
     };
 
     /**
-     * Cierra el modal
+     * Cierra el modal (Posponer 8 horas)
      */
     const handleClose = () => {
+        console.log('[AutoPush] Modal cerrado por el usuario, posponer 8h');
+        setNextPromptTime(COOLDOWN_CLOSE_MS);
         setShowModal(false);
     };
 

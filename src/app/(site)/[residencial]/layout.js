@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import LocationUpdatePrompt from "@/components/access/LocationUpdatePrompt";
+import { AutoPushSubscribe } from "@/components/ui/AutoPushSubscribe";
 
 export default function ResidentialLayout({ children }) {
     const router = useRouter();
@@ -98,6 +99,7 @@ export default function ResidentialLayout({ children }) {
     return (
         <>
             <LocationUpdatePrompt />
+            <AutoPushSubscribe />
             {children}
         </>
     );

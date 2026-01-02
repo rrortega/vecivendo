@@ -17,9 +17,13 @@ export const PushSubscriptionModal = ({
 }) => {
     if (!isOpen) return null;
 
+    const handleClose = () => {
+        onClose?.();
+    };
+
     const handleDecline = () => {
         onDecline?.();
-        onClose();
+        onClose?.();
     };
 
     const handleAccept = async () => {
@@ -31,7 +35,7 @@ export const PushSubscriptionModal = ({
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-                onClick={handleDecline}
+                onClick={handleClose}
             />
 
             {/* Modal */}
@@ -40,7 +44,7 @@ export const PushSubscriptionModal = ({
                 <div className="relative bg-gradient-to-br from-primary via-primary/90 to-primary/80 px-6 py-8 text-white">
                     {/* Botón cerrar */}
                     <button
-                        onClick={handleDecline}
+                        onClick={handleClose}
                         className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-colors"
                         disabled={isLoading}
                     >
