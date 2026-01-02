@@ -40,7 +40,13 @@ export async function GET(request) {
 
         // Construir el providerId esperado: teléfono + "PUSH"
         // Limpiamos el teléfono para que solo tenga números
-        const cleanPhone = phone ? phone.replace(/\D/g, '') : (userId ? userId : null);
+        let cleanPhone = phone ? phone.replace(/\D/g, '') : (userId ? userId : null);
+
+        // Normalización para México (521)
+        if (cleanPhone && cleanPhone.startsWith('52') && cleanPhone.length === 12 && !cleanPhone.startsWith('521')) {
+            cleanPhone = '521' + cleanPhone.substring(2);
+        }
+
         const expectedProviderId = cleanPhone ? `${cleanPhone}PUSH` : null;
 
         // Función para buscar suscripción

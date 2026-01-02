@@ -88,21 +88,11 @@ export const AutoPushSubscribe = () => {
 
             const userData = JSON.parse(globalProfileData);
 
-            // El userId es el telefono sin el signo + (según requerimiento)
-            let userId = userData.userId;
-            if (!userId && userData.telefono) {
-                userId = userData.telefono.replace(/\D/g, '');
-            }
-
-            // Normalización para México (Appwrite usa 521 + 10 dígitos)
-            if (userId && userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
-                userId = '521' + userId.substring(2);
-            }
-
+            // Devolver datos tal cual están en localStorage
             return {
                 telefono: userData.telefono,
                 telefono_verificado: userData.telefono_verificado,
-                userId: userId
+                userId: userData.userId || userData.telefono?.replace(/\D/g, '')
             };
         } catch (e) {
             console.error('[AutoPush] Error parsing user data:', e);
@@ -265,7 +255,19 @@ export const AutoPushSubscribe = () => {
             const token = endpoint.split('/').pop();
 
             // Registrar el target en el servidor
-            await registerPushTarget(userData.userId, userData.telefono, token);
+            const result = await registerPushTarget(userData.userId, userData.telefono, token);
+
+            // Si el servidor usó un ID diferente (normalizado), actualizamos el localStorage
+            if (result.workingUserId && result.workingUserId !== userData.userId) {
+                console.log('[AutoPush] Actualizando userId local al normalizado:', result.workingUserId);
+                try {
+                    const globalData = JSON.parse(localStorage.getItem('vecivendo_user_global') || '{}');
+                    globalData.userId = result.workingUserId;
+                    localStorage.setItem('vecivendo_user_global', JSON.stringify(globalData));
+                } catch (err) {
+                    console.error('[AutoPush] Error actualizando localStorage:', err);
+                }
+            }
 
             // Limpiar el cooldown
             clearCooldown();

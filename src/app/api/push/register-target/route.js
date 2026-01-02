@@ -29,14 +29,12 @@ export async function POST(request) {
             );
         }
 
-        // Si no hay userId, lo derivamos del teléfono (teléfono sin +)
-        if (!userId) {
-            userId = phone.replace(/\D/g, '');
-        }
+        // Limpiar teléfono de entrada para uso interno
+        const rawPhone = phone.replace(/\D/g, '');
 
-        // Normalización para México (Appwrite usa 521 + 10 dígitos)
-        if (userId && userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
-            userId = '521' + userId.substring(2);
+        // Si no hay userId enviado, lo derivamos del teléfono
+        if (!userId) {
+            userId = rawPhone;
         }
 
         if (!token) {
@@ -46,19 +44,12 @@ export async function POST(request) {
             );
         }
 
-        // Limpiar el teléfono y construir el providerId
-        const cleanPhone = phone.replace(/\D/g, '');
-        const providerId = `${cleanPhone}PUSH`;
-
-        console.log('[RegisterTarget] Registrando push target:', {
-            userId,
-            providerId,
-            tokenPreview: token.substring(0, 30) + '...'
-        });
-
-        // Función interna para realizar la operación de Appwrite con lógica de reintento
+        // Función interna para realizar la operación de Appwrite
         const performOperation = async (currentUserId) => {
             console.log(`[RegisterTarget] Intentando operación para userId: ${currentUserId}`);
+
+            // El providerId siempre debe ser el ID del usuario + PUSH para consistencia
+            const providerId = `${currentUserId}PUSH`;
 
             // Primero verificamos si ya existe un target con este providerId
             const existingTargets = await users.listTargets(currentUserId);
@@ -67,51 +58,52 @@ export async function POST(request) {
             );
 
             if (existingPushTarget) {
-                // Si ya existe, actualizamos el token (identifier)
                 console.log('[RegisterTarget] Actualizando target existente:', existingPushTarget.$id);
-
-                return await users.updateTarget(
+                const updated = await users.updateTarget(
                     currentUserId,
                     existingPushTarget.$id,
-                    token // nuevo identifier (token FCM)
+                    token
                 );
+                return { ...updated, workingUserId: currentUserId };
             }
 
             // Crear nuevo target
             const targetId = ID.unique();
-            return await users.createTarget(
+            const created = await users.createTarget(
                 currentUserId,
                 targetId,
-                'push',           // providerType
-                token,            // identifier (el token FCM)
-                providerId        // providerId (teléfono + PUSH)
+                'push',
+                token,
+                providerId
             );
+            return { ...created, workingUserId: currentUserId };
         };
 
         try {
-            // 1. Intentar con el userId recibido (o el ya normalizado si aplica)
+            // 1. Intentar con el userId recibido (tal cual viene del frontend)
             const result = await performOperation(userId);
 
             return NextResponse.json({
                 success: true,
                 action: 'completed',
                 targetId: result.$id,
-                providerId: result.providerId
+                providerId: result.providerId,
+                workingUserId: result.workingUserId
             });
 
         } catch (appwriteError) {
-            // 2. Si el error es "User not found", intentamos con la variante de ID alternativo
+            // 2. Si el error es "User not found", intentamos con la variante de ID alternativo (normalización de México)
             const isUserNotFoundError = appwriteError.message?.includes('User with the requested ID could not be found') || appwriteError.code === 404;
 
             if (isUserNotFoundError) {
                 console.log('[RegisterTarget] Usuario no encontrado, intentando con variante de ID...');
 
                 let altUserId = null;
-                // Si es México y no tiene el 1, intentamos ponérselo
+                // Si es México (52) y no tiene el 1, intentamos ponérselo (521)
                 if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
                     altUserId = '521' + userId.substring(2);
                 }
-                // Si es México y TIENE el 1, intentamos quitárselo
+                // Al revés: si trae el 1 pero no existe, intentar sin el 1
                 else if (userId.startsWith('521') && userId.length === 13) {
                     altUserId = '52' + userId.substring(3);
                 }
@@ -125,11 +117,11 @@ export async function POST(request) {
                             action: 'completed_with_retry',
                             targetId: result.$id,
                             providerId: result.providerId,
+                            workingUserId: result.workingUserId,
                             usedAltId: true
                         });
                     } catch (retryError) {
                         console.error('[RegisterTarget] Error en reintento:', retryError);
-                        // Si falla el reintento, lanzamos el error original o el nuevo
                         throw retryError;
                     }
                 }
@@ -140,13 +132,13 @@ export async function POST(request) {
                 return NextResponse.json({
                     success: true,
                     action: 'already_exists',
-                    message: 'Target ya registrado'
+                    message: 'Target ya registrado',
+                    workingUserId: userId // Asumimos que el ID original era el correcto
                 });
             }
 
             throw appwriteError;
         }
-
     } catch (error) {
         console.error('[RegisterTarget] Error:', error);
         return NextResponse.json(
@@ -183,7 +175,13 @@ export async function DELETE(request) {
 
             // Si no tenemos targetId pero tenemos phone, buscamos el target
             if (!actualTargetId && phone) {
-                const cleanPhone = phone.replace(/\D/g, '');
+                let cleanPhone = phone.replace(/\D/g, '');
+
+                // Normalización para México (521)
+                if (cleanPhone.startsWith('52') && cleanPhone.length === 12 && !cleanPhone.startsWith('521')) {
+                    cleanPhone = '521' + cleanPhone.substring(2);
+                }
+
                 const providerId = `${cleanPhone}PUSH`;
 
                 const targets = await users.listTargets(currentUserId);
