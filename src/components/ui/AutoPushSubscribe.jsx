@@ -94,6 +94,11 @@ export const AutoPushSubscribe = () => {
                 userId = userData.telefono.replace(/\D/g, '');
             }
 
+            // Normalización para México (Appwrite usa 521 + 10 dígitos)
+            if (userId && userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+                userId = '521' + userId.substring(2);
+            }
+
             return {
                 telefono: userData.telefono,
                 telefono_verificado: userData.telefono_verificado,

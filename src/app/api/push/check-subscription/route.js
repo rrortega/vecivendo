@@ -33,6 +33,11 @@ export async function GET(request) {
             userId = phone.replace(/\D/g, '');
         }
 
+        // Normalización para México (Appwrite usa 521 + 10 dígitos)
+        if (userId && userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+            userId = '521' + userId.substring(2);
+        }
+
         // Construir el providerId esperado: teléfono + "PUSH"
         // Limpiamos el teléfono para que solo tenga números
         const cleanPhone = phone ? phone.replace(/\D/g, '') : (userId ? userId : null);

@@ -34,6 +34,11 @@ export async function POST(request) {
             userId = phone.replace(/\D/g, '');
         }
 
+        // Normalización para México (Appwrite usa 521 + 10 dígitos)
+        if (userId && userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+            userId = '521' + userId.substring(2);
+        }
+
         if (!token) {
             return NextResponse.json(
                 { error: 'Se requiere el token FCM' },
@@ -127,7 +132,12 @@ export async function POST(request) {
 export async function DELETE(request) {
     try {
         const body = await request.json();
-        const { userId, targetId, phone } = body;
+        let { userId, targetId, phone } = body;
+
+        // Normalización para México (Appwrite usa 521 + 10 dígitos)
+        if (userId && userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+            userId = '521' + userId.substring(2);
+        }
 
         if (!userId) {
             return NextResponse.json(
