@@ -124,21 +124,28 @@ self.addEventListener('push', (event) => {
     // Intentar parsear los datos del push
     if (event.data) {
         try {
-            const payload = event.data.json();
-            console.log('[SW] Push payload:', payload);
+            const rawData = event.data.text();
+            console.log('[SW] Raw data received:', rawData);
 
-            // Formato de Appwrite
+            const payload = event.data.json();
+            console.log('[SW] Push JSON payload:', payload);
+
+            // Appwrite suele enviar los datos reales dentro de un objeto 'data' o directamente
+            // Si viene de FCM/Appwrite, el mensaje puede estar en payload.data o payload.notification
+            const notification = payload.notification || {};
+            const customData = payload.data || {};
+
             data = {
-                title: payload.title || data.title,
-                body: payload.body || payload.message || data.body,
-                icon: payload.icon || data.icon,
-                badge: payload.badge || data.badge,
-                tag: payload.tag || payload.id || data.tag,
-                data: payload.data || payload,
-                image: payload.image || null,
+                title: notification.title || payload.title || customData.title || data.title,
+                body: notification.body || payload.body || payload.message || customData.body || customData.message || data.body,
+                icon: notification.icon || payload.icon || customData.icon || data.icon,
+                badge: notification.badge || payload.badge || customData.badge || data.badge,
+                tag: payload.tag || payload.id || customData.id || data.tag,
+                data: customData || payload,
+                image: notification.image || payload.image || customData.image || null,
             };
         } catch (e) {
-            // Si no es JSON, usar el texto plano
+            console.warn('[SW] Error parsing push JSON, using text fallback:', e);
             data.body = event.data.text() || data.body;
         }
     }
@@ -186,7 +193,19 @@ self.addEventListener('notificationclick', (event) => {
 
     // Obtener la URL a abrir
     const notificationData = event.notification.data || {};
-    const urlToOpen = notificationData.url || notificationData.link || '/';
+    let urlToOpen = notificationData.url || notificationData.link || '/';
+
+    // Lógica especial para anuncios (action: "ad")
+    if (notificationData.action === 'ad' && notificationData.id && notificationData.slug) {
+        urlToOpen = `/${notificationData.slug}/anuncios/${notificationData.id}`;
+        console.log('[SW] Redirecting to ad:', urlToOpen);
+    }
+
+    // Lógica especial para pedidos (action: "order")
+    if (notificationData.action === 'order' && notificationData.order && notificationData.slug) {
+        urlToOpen = `/${notificationData.slug}/pedido/${notificationData.order}`;
+        console.log('[SW] Redirecting to order:', urlToOpen);
+    }
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true })

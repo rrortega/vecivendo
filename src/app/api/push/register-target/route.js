@@ -15,7 +15,6 @@ const messaging = new Messaging(client);
 /**
  * Endpoint para registrar un push target (token FCM) para el usuario
  * POST /api/push/register-target
- * Body: { userId, phone, token }
  */
 export async function POST(request) {
     try {
@@ -23,253 +22,156 @@ export async function POST(request) {
         let { userId, phone, token } = body;
 
         if (!phone) {
-            return NextResponse.json(
-                { error: 'Se requiere phone' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'Se requiere phone' }, { status: 400 });
         }
 
-        // Limpiar teléfono de entrada para uso interno
         const rawPhone = phone.replace(/\D/g, '');
-
-        // Si no hay userId enviado, lo derivamos del teléfono
-        if (!userId) {
-            userId = rawPhone;
-        }
+        if (!userId) userId = rawPhone;
 
         if (!token) {
-            return NextResponse.json(
-                { error: 'Se requiere el token FCM' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'Se requiere el token FCM' }, { status: 400 });
         }
+
+        // Función para limpiar targets en un usuario específico
+        const cleanupUserTargets = async (uid) => {
+            try {
+                console.log(`[RegisterTarget] Limpiando targets para user: ${uid}`);
+                const response = await users.listTargets({ userId: uid });
+                for (const t of response.targets) {
+                    if (t.providerType === 'push') {
+                        // Eliminamos si es un ID aleatorio o si el token es viejo
+                        if (t.$id !== uid || t.identifier !== token) {
+                            console.log(`[RegisterTarget] Eliminando target obsoleto ${t.$id}`);
+                            await users.deleteTarget({
+                                userId: uid,
+                                targetId: t.$id
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                if (e.code !== 404) console.warn(`[Cleanup] Error en ${uid}:`, e.message);
+            }
+        };
 
         // Función interna para realizar la operación de Appwrite
         const performOperation = async (currentUserId) => {
-            console.log(`[RegisterTarget] Intentando operación para userId: ${currentUserId}`);
+            // Calcular variante (52 <-> 521)
+            const altUserId = currentUserId.startsWith('521') ? '52' + currentUserId.substring(3) :
+                (currentUserId.startsWith('52') && currentUserId.length === 12 ? '521' + currentUserId.substring(2) : null);
 
-            // El providerId siempre debe ser el ID del usuario + PUSH para consistencia
-            const providerId = `${currentUserId}PUSH`;
+            // Limpiar targets en AMBAS variantes para evitar "Ghost Targets"
+            await cleanupUserTargets(currentUserId);
+            if (altUserId) await cleanupUserTargets(altUserId);
 
-            // Primero verificamos si ya existe un target con este providerId
-            const existingTargets = await users.listTargets(currentUserId);
-            const existingPushTarget = existingTargets.targets.find(
-                target => target.providerType === 'push' && target.providerId === providerId
-            );
+            const providerId = 'firebase';
+            const targetId = currentUserId;
 
-            if (existingPushTarget) {
-                console.log('[RegisterTarget] Actualizando target existente:', existingPushTarget.$id);
-                const updated = await users.updateTarget(
-                    currentUserId,
-                    existingPushTarget.$id,
-                    token
-                );
-                return { ...updated, workingUserId: currentUserId };
+            try {
+                const created = await users.createTarget({
+                    userId: currentUserId,
+                    targetId: targetId,
+                    providerType: 'push',
+                    identifier: token,
+                    providerId: providerId
+                });
+                return { ...created, workingUserId: currentUserId };
+            } catch (e) {
+                if (e.code === 409) {
+                    const updated = await users.updateTarget({
+                        userId: currentUserId,
+                        targetId: targetId,
+                        identifier: token,
+                        providerId: providerId
+                    });
+                    return { ...updated, workingUserId: currentUserId };
+                }
+                throw e;
             }
-
-            // Crear nuevo target
-            const targetId = ID.unique();
-            const created = await users.createTarget(
-                currentUserId,
-                targetId,
-                'push',
-                token,
-                providerId
-            );
-            return { ...created, workingUserId: currentUserId };
         };
 
         try {
-            // 1. Intentar con el userId recibido (tal cual viene del frontend)
             const result = await performOperation(userId);
-
             return NextResponse.json({
                 success: true,
                 action: 'completed',
                 targetId: result.$id,
-                providerId: result.providerId,
+                providerId: result.providerId || 'firebase',
                 workingUserId: result.workingUserId
             });
-
         } catch (appwriteError) {
-            // 2. Si el error es "User not found", intentamos con la variante de ID alternativo (normalización de México)
             const isUserNotFoundError = appwriteError.message?.includes('User with the requested ID could not be found') || appwriteError.code === 404;
-
             if (isUserNotFoundError) {
-                console.log('[RegisterTarget] Usuario no encontrado, intentando con variante de ID genérica...');
+                const altUserId = userId.startsWith('521') ? '52' + userId.substring(3) :
+                    (userId.startsWith('52') && userId.length === 12 ? '521' + userId.substring(2) : null);
 
-                // Lista de códigos de país (CC) comunes
-                const countryCodes = ['52', '1', '34', '54', '55', '57', '51', '56', '58', '502', '503', '504', '505', '506', '507', '591', '593', '595', '598'];
-
-                let altUserId = null;
-                // Buscar el CC que coincida al inicio (ordenar por longitud descendente para evitar falsos positivos)
-                for (const cc of countryCodes.sort((a, b) => b.length - a.length)) {
-                    if (userId.startsWith(cc)) {
-                        const rest = userId.substring(cc.length);
-                        // Si después del CC ya hay un '1', probamos a quitárselo
-                        if (rest.startsWith('1')) {
-                            altUserId = cc + rest.substring(1);
-                        }
-                        // Si no hay un '1', probamos a insertárselo
-                        else {
-                            altUserId = cc + '1' + rest;
-                        }
-                        break;
-                    }
-                }
-
-                if (altUserId && altUserId !== userId) {
-                    try {
-                        console.log(`[RegisterTarget] Reintentando con ID alternativo calculado: ${altUserId}`);
-                        const result = await performOperation(altUserId);
-                        return NextResponse.json({
-                            success: true,
-                            action: 'completed_with_retry',
-                            targetId: result.$id,
-                            providerId: result.providerId,
-                            workingUserId: result.workingUserId,
-                            usedAltId: true
-                        });
-                    } catch (retryError) {
-                        console.error('[RegisterTarget] Error en reintento con ID alternativo:', retryError);
-                        throw retryError;
-                    }
+                if (altUserId) {
+                    const result = await performOperation(altUserId);
+                    return NextResponse.json({
+                        success: true,
+                        action: 'completed_with_retry',
+                        targetId: result.$id,
+                        providerId: result.providerId || 'firebase',
+                        workingUserId: result.workingUserId,
+                        usedAltId: true
+                    });
                 }
             }
-
-            // Si es un error de target duplicado, lo manejamos de forma amigable
-            if (appwriteError.code === 409) {
-                return NextResponse.json({
-                    success: true,
-                    action: 'already_exists',
-                    message: 'Target ya registrado',
-                    workingUserId: userId // Asumimos que el ID original era el correcto
-                });
-            }
-
             throw appwriteError;
         }
     } catch (error) {
         console.error('[RegisterTarget] Error:', error);
-        return NextResponse.json(
-            { error: 'Error al registrar push target', details: error.message },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Error al registrar push target', details: error.message }, { status: 500 });
     }
 }
 
 /**
  * Endpoint para eliminar un push target
- * DELETE /api/push/register-target
- * Body: { userId, targetId } o { userId, phone }
  */
 export async function DELETE(request) {
     try {
         const body = await request.json();
         let { userId, targetId, phone } = body;
 
-        // Normalización para México (Appwrite usa 521 + 10 dígitos)
         if (userId && userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
             userId = '521' + userId.substring(2);
         }
 
-        if (!userId) {
-            return NextResponse.json(
-                { error: 'Se requiere userId' },
-                { status: 400 }
-            );
-        }
+        if (!userId) return NextResponse.json({ error: 'Se requiere userId' }, { status: 400 });
 
         const performDelete = async (currentUserId) => {
             let actualTargetId = targetId;
-
-            // Si no tenemos targetId pero tenemos phone, buscamos el target
             if (!actualTargetId && phone) {
                 let cleanPhone = phone.replace(/\D/g, '');
-
-                // Normalización para México (521)
                 if (cleanPhone.startsWith('52') && cleanPhone.length === 12 && !cleanPhone.startsWith('521')) {
                     cleanPhone = '521' + cleanPhone.substring(2);
                 }
-
-                const providerId = `${cleanPhone}PUSH`;
-
-                const targets = await users.listTargets(currentUserId);
-                const pushTarget = targets.targets.find(
-                    target => target.providerType === 'push' && target.providerId === providerId
-                );
-
-                if (pushTarget) {
-                    actualTargetId = pushTarget.$id;
-                }
+                const response = await users.listTargets({ userId: currentUserId });
+                const pushTarget = response.targets.find(t => t.providerType === 'push' && t.providerId === 'firebase');
+                actualTargetId = pushTarget ? pushTarget.$id : cleanPhone;
             }
-
-            if (!actualTargetId) {
-                throw new Error('NOT_FOUND');
-            }
-
-            await users.deleteTarget(currentUserId, actualTargetId);
+            if (!actualTargetId) throw new Error('NOT_FOUND');
+            await users.deleteTarget({
+                userId: currentUserId,
+                targetId: actualTargetId
+            });
             return actualTargetId;
         };
 
         try {
             const deletedId = await performDelete(userId);
-            return NextResponse.json({
-                success: true,
-                action: 'deleted',
-                targetId: deletedId
-            });
+            return NextResponse.json({ success: true, action: 'deleted', targetId: deletedId });
         } catch (error) {
-            const isUserNotFoundError = error.message?.includes('User with the requested ID could not be found') || error.code === 404;
-
-            if (isUserNotFoundError) {
-                console.log('[RegisterTarget] Usuario no encontrado en DELETE, intentando con variante de ID genérica...');
-
-                const countryCodes = ['52', '1', '34', '54', '55', '57', '51', '56', '58', '502', '503', '504', '505', '506', '507', '591', '593', '595', '598'];
-                let altUserId = null;
-
-                for (const cc of countryCodes.sort((a, b) => b.length - a.length)) {
-                    if (userId.startsWith(cc)) {
-                        const rest = userId.substring(cc.length);
-                        if (rest.startsWith('1')) {
-                            altUserId = cc + rest.substring(1);
-                        } else {
-                            altUserId = cc + '1' + rest;
-                        }
-                        break;
-                    }
-                }
-
-                if (altUserId && altUserId !== userId) {
-                    try {
-                        console.log(`[RegisterTarget] Reintentando DELETE con ID alternativo calculado: ${altUserId}`);
-                        const deletedId = await performDelete(altUserId);
-                        return NextResponse.json({
-                            success: true,
-                            action: 'deleted_with_retry',
-                            targetId: deletedId,
-                            usedAltId: true
-                        });
-                    } catch (retryError) {
-                        if (retryError.message === 'NOT_FOUND') {
-                            return NextResponse.json({ error: 'No se encontró el target' }, { status: 404 });
-                        }
-                        throw retryError;
-                    }
-                }
+            const altUserId = userId.startsWith('521') ? '52' + userId.substring(3) :
+                (userId.startsWith('52') && userId.length === 12 ? '521' + userId.substring(2) : null);
+            if (altUserId) {
+                const deletedId = await performDelete(altUserId);
+                return NextResponse.json({ success: true, action: 'deleted_with_retry', targetId: deletedId });
             }
-
-            if (error.message === 'NOT_FOUND') {
-                return NextResponse.json({ error: 'No se encontró el target' }, { status: 404 });
-            }
+            if (error.message === 'NOT_FOUND' || error.code === 404) return NextResponse.json({ error: 'No se encontró' }, { status: 404 });
             throw error;
         }
-
     } catch (error) {
-        console.error('[RegisterTarget] Error al eliminar:', error);
-        return NextResponse.json(
-            { error: 'Error al eliminar push target', details: error.message },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Error al eliminar', details: error.message }, { status: 500 });
     }
 }

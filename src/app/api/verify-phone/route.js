@@ -105,7 +105,7 @@ export async function POST(request) {
         }
 
         // CASO 2: Flujo OTP (envío de SMS)
-        if (!checkRateLimit(ip, phone.replace(/[\+\s]/g, '').trim())) {
+        if (!checkRateLimit(ip, phone.replace(/[\+\s]/g, '').trim()) && !code) {
             return NextResponse.json(
                 { error: "Demasiados intentos. Por favor espera un minuto antes de intentar nuevamente." },
                 { status: 429 }

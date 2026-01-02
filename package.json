@@ -15,6 +15,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "appwrite": "^16.1.0",
     "dotenv": "^17.2.3",
+    "firebase": "^12.7.0",
     "framer-motion": "^12.23.25",
     "gray-matter": "^4.0.3",
     "html-react-parser": "^5.2.11",

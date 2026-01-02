@@ -4,8 +4,6 @@ import React, { useState, useEffect } from "react";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { CommunityAlertBar } from "@/components/layout/CommunityAlertBar";
-import { client } from "@/lib/appwrite";
-import { Databases, Query } from "appwrite";
 import { useResidential } from "@/hooks/useResidential";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Clock, Package, Loader2, ChevronRight } from "lucide-react";
@@ -30,34 +28,25 @@ export default function HistoryPage({ params }) {
             // User loaded but has no phone, stop loading
             setIsLoading(false);
         }
-    }, [userProfile]);
+    }, [userProfile?.telefono]);
 
     const fetchPedidos = async () => {
         setIsLoading(true);
         try {
-            const databases = new Databases(client);
-            const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
+            // Usar el BFF en lugar de llamadas directas a la base de datos
+            const response = await fetch(`/api/pedidos/history?phone=${userProfile.telefono}`);
 
-            // Fetch pedidos realizados (como comprador) - using phone number
-            if (userProfile.telefono) {
-                const realizadosResponse = await databases.listDocuments(dbId, "pedidos", [
-                    Query.equal("comprador_telefono", userProfile.telefono),
-                    Query.orderDesc("$createdAt"),
-                    Query.limit(100)
-                ]);
-                setPedidosRealizados(realizadosResponse.documents);
-
-                // Fetch pedidos recibidos (como anunciante)
-                const recibidosResponse = await databases.listDocuments(dbId, "pedidos", [
-                    Query.equal("anunciante_telefono", userProfile.telefono),
-                    Query.orderDesc("$createdAt"),
-                    Query.limit(100)
-                ]);
-                setPedidosRecibidos(recibidosResponse.documents);
+            if (!response.ok) {
+                throw new Error("Error al obtener pedidos del servidor");
             }
 
+            const data = await response.json();
+
+            setPedidosRealizados(data.realizados || []);
+            setPedidosRecibidos(data.recibidos || []);
+
         } catch (error) {
-            console.error("Error fetching pedidos:", error);
+            console.error("Error fetching pedidos via BFF:", error);
         } finally {
             setIsLoading(false);
         }

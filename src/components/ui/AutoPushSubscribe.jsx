@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { PushSubscriptionModal } from './PushSubscriptionModal';
+import { getFirebaseMessaging } from '@/lib/firebase';
 
 // Clave para almacenar cuándo podemos volver a preguntar
 const PUSH_NEXT_PROMPT_KEY = 'vecivendo_push_next_prompt';
@@ -24,6 +25,67 @@ const COOLDOWN_CLOSE_MS = 8 * 60 * 60 * 1000;    // 8 horas si solo cierra el mo
 export const AutoPushSubscribe = () => {
     const pathname = usePathname();
     const { isSupported, permission, isSubscribed, subscribe, subscription } = usePushNotifications();
+
+    // Validación de configuración Firebase y Manejo de mensajes en primer plano
+    useEffect(() => {
+        const firebaseConfig = {
+            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+            messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+        };
+
+        console.log('--- VALIDACIÓN PWA PUSH ---');
+        console.log('firebaseConfig.projectId:', firebaseConfig.projectId);
+        console.log('firebaseConfig.messagingSenderId:', firebaseConfig.messagingSenderId);
+
+        fetch('/api/push/vapid-key').then(r => r.json()).then(data => {
+            console.log('VAPID Key en uso:', data.publicKey);
+            console.log('---------------------------');
+        });
+
+        // Manejar notificaciones cuando la app está abierta (foreground)
+        const setupForegroundListener = async () => {
+            try {
+                const messaging = await getFirebaseMessaging();
+                if (messaging) {
+                    const { onMessage } = await import('firebase/messaging');
+                    onMessage(messaging, (payload) => {
+                        console.log('[Push] Mensaje en primer plano:', payload);
+
+                        if (Notification.permission === 'granted') {
+                            const { title, body, icon } = payload.notification || {};
+                            const customData = payload.data || {};
+
+                            const n = new Notification(title || 'Vecivendo', {
+                                body: body || 'Tienes una nueva notificación',
+                                icon: icon || '/icon-192x192.png',
+                                data: customData
+                            });
+
+                            n.onclick = (e) => {
+                                e.preventDefault();
+                                window.focus();
+
+                                let url = customData.url || customData.link || '/';
+                                if (customData.action === 'ad' && customData.id && customData.slug) {
+                                    url = `/${customData.slug}/anuncios/${customData.id}`;
+                                } else if (customData.action === 'order' && customData.order && customData.slug) {
+                                    url = `/${customData.slug}/pedido/${customData.order}`;
+                                }
+
+                                window.location.href = url;
+                                n.close();
+                            };
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('[Push] Error al configurar listener de primer plano:', err);
+            }
+        };
+
+        setupForegroundListener();
+    }, []);
 
     const [showModal, setShowModal] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
@@ -178,43 +240,74 @@ export const AutoPushSubscribe = () => {
             // Guardar referencia para uso posterior
             userDataRef.current = userData;
 
-            // Si estamos en periodo de espera, no mostrar modal
-            if (isWaitPeriodActive()) {
-                console.log('[AutoPush] Periodo de espera activo, posponiendo verificación');
-                return;
-            }
-
-            setIsChecking(true);
-
             try {
-                // Verificar si ya tiene push target registrado
+                // 1. Verificar si la Clave VAPID ha cambiado
+                const vapidRes = await fetch('/api/push/vapid-key');
+                const { publicKey: currentVapidKey } = await vapidRes.json();
+                const storedVapidKey = localStorage.getItem('vecivendo_last_vapid_key');
+
+                // Si ha cambiado la clave VAPID, forzamos limpieza local
+                if (currentVapidKey && storedVapidKey && currentVapidKey !== storedVapidKey) {
+                    console.log('[AutoPush] Clave VAPID detectada diferente, forzando re-suscripción...');
+                    const reg = await navigator.serviceWorker.ready;
+                    const sub = await reg.pushManager.getSubscription();
+                    if (sub) {
+                        await sub.unsubscribe();
+                        console.log('[AutoPush] Suscripción antigua eliminada');
+                    }
+                    localStorage.removeItem('vecivendo_last_vapid_key');
+                    // Al limpiar, el flujo seguirá como normal y pedirá suscripción
+                }
+
+                // Si estamos en periodo de espera, no mostrar modal
+                if (isWaitPeriodActive()) {
+                    console.log('[AutoPush] Periodo de espera activo, posponiendo verificación');
+                    return;
+                }
+
+                setIsChecking(true);
+
+                // Verificar si ya tiene push target registrado en Appwrite
                 const hasTarget = await checkPushSubscription(userData.userId, userData.telefono);
 
-                if (hasTarget) {
-                    console.log('[AutoPush] Usuario ya tiene push target registrado');
+                // Si ya tiene target y la suscripción local coincide con la clave actual
+                if (hasTarget && storedVapidKey === currentVapidKey) {
+                    console.log('[AutoPush] Usuario ya tiene push target y VAPID coincide');
                     setIsChecking(false);
                     return;
                 }
 
-                // Si también ya está suscrito localmente, intentar registrar el target
-                if (isSubscribed && subscription) {
-                    console.log('[AutoPush] Suscrito localmente pero sin target, registrando...');
-                    try {
-                        // Obtener el token FCM del endpoint
-                        const endpoint = subscription.endpoint;
-                        // El token suele estar al final del endpoint para FCM
-                        const token = endpoint.split('/').pop();
+                // Verificar suscripción local actual
+                const registration = await navigator.serviceWorker.ready;
+                const existingSub = await registration.pushManager.getSubscription();
 
+                if (existingSub) {
+                    // Si existe suscripción local pero no hay target o VAPID cambió
+                    console.log('[AutoPush] Sincronizando suscripción existente...');
+
+                    let token = null;
+                    try {
+                        // Intentar obtener token oficial vía SDK si es posible
+                        const messaging = await getFirebaseMessaging();
+                        const { getToken } = await import('firebase/messaging');
+                        token = await getToken(messaging, {
+                            vapidKey: currentVapidKey,
+                            serviceWorkerRegistration: registration
+                        });
+                    } catch (err) {
+                        console.warn('[AutoPush] Falló getToken SDK, usando fallback nativo:', err.message);
+                        token = existingSub.endpoint.split('/').pop();
+                    }
+
+                    if (token) {
                         await registerPushTarget(userData.userId, userData.telefono, token);
-                        console.log('[AutoPush] Target registrado exitosamente');
-                    } catch (e) {
-                        console.error('[AutoPush] Error registrando target existente:', e);
+                        localStorage.setItem('vecivendo_last_vapid_key', currentVapidKey);
                     }
                     setIsChecking(false);
                     return;
                 }
 
-                console.log('[AutoPush] No hay push target, mostrando modal');
+                console.log('[AutoPush] No hay suscripción válida, mostrando modal');
                 setShowModal(true);
 
             } catch (e) {
@@ -250,12 +343,18 @@ export const AutoPushSubscribe = () => {
                 return;
             }
 
-            // Obtener el token FCM
-            const endpoint = pushSubscription.endpoint;
-            const token = endpoint.split('/').pop();
+            // Obtener el token FCM (ahora viene directamente en el objeto de suscripción que creamos)
+            const token = pushSubscription.token || pushSubscription.endpoint.split('/').pop();
 
             // Registrar el target en el servidor
             const result = await registerPushTarget(userData.userId, userData.telefono, token);
+
+            // Guardar la clave VAPID que acabamos de usar con éxito
+            const vapidRes = await fetch('/api/push/vapid-key');
+            const { publicKey } = await vapidRes.json();
+            if (publicKey) {
+                localStorage.setItem('vecivendo_last_vapid_key', publicKey);
+            }
 
             // Si el servidor usó un ID diferente (normalizado), actualizamos el localStorage
             if (result.workingUserId && result.workingUserId !== userData.userId) {

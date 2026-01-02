@@ -38,21 +38,19 @@ export async function GET(request) {
             userId = '521' + userId.substring(2);
         }
 
-        // Construir el providerId esperado: teléfono + "PUSH"
-        // Limpiamos el teléfono para que solo tenga números
-        let cleanPhone = phone ? phone.replace(/\D/g, '') : (userId ? userId : null);
-
-        // Normalización para México (521)
-        if (cleanPhone && cleanPhone.startsWith('52') && cleanPhone.length === 12 && !cleanPhone.startsWith('521')) {
-            cleanPhone = '521' + cleanPhone.substring(2);
-        }
-
-        const expectedProviderId = cleanPhone ? `${cleanPhone}PUSH` : null;
+        // El providerId constante usado para Firebase Cloud Messaging
+        const expectedProviderId = 'firebase';
 
         // Función para buscar suscripción
         const findPushSubscription = async (currentUserId) => {
-            const targets = await users.listTargets(currentUserId);
-            return targets.targets.find(target => target.providerType === 'push');
+            const response = await users.listTargets({ userId: currentUserId });
+            // Buscamos el target que sea exactamente el ID del usuario
+            // Si el ID es diferente (como 'edb5...'), lo ignoramos para forzar el re-registro/limpieza
+            return response.targets.find(target =>
+                target.providerType === 'push' &&
+                target.providerId === expectedProviderId &&
+                target.$id === currentUserId
+            );
         };
 
         // Si tenemos userId, intentamos buscar los targets del usuario
@@ -79,11 +77,7 @@ export async function GET(request) {
                     for (const cc of countryCodes.sort((a, b) => b.length - a.length)) {
                         if (userId.startsWith(cc)) {
                             const rest = userId.substring(cc.length);
-                            if (rest.startsWith('1')) {
-                                altUserId = cc + rest.substring(1);
-                            } else {
-                                altUserId = cc + '1' + rest;
-                            }
+                            altUserId = rest.startsWith('1') ? cc + rest.substring(1) : cc + '1' + rest;
                             break;
                         }
                     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 /**
  * Hook para manejar el perfil del usuario
@@ -67,10 +67,10 @@ export const useUserProfile = (residencialSlug = null) => {
     }, [residencialSlug]);
 
     // Combinar datos globales y del residencial en un solo objeto
-    const userProfile = {
+    const userProfile = useMemo(() => ({
         ...globalData,
         ...residentialData
-    };
+    }), [globalData, residentialData]);
 
     const updateUserProfile = (newProfile) => {
         // Separar las actualizaciones en globales y residenciales
