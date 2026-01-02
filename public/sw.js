@@ -197,7 +197,7 @@ self.addEventListener('notificationclick', (event) => {
 
     // Lógica especial para anuncios (action: "ad")
     if (notificationData.action === 'ad' && notificationData.id && notificationData.slug) {
-        urlToOpen = `/${notificationData.slug}/anuncios/${notificationData.id}`;
+        urlToOpen = `/${notificationData.slug}/anuncio/${notificationData.id}`;
         console.log('[SW] Redirecting to ad:', urlToOpen);
     }
 

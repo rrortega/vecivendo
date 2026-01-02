@@ -68,7 +68,7 @@ export const AutoPushSubscribe = () => {
 
                                 let url = customData.url || customData.link || '/';
                                 if (customData.action === 'ad' && customData.id && customData.slug) {
-                                    url = `/${customData.slug}/anuncios/${customData.id}`;
+                                    url = `/${customData.slug}/anuncio/${customData.id}`;
                                 } else if (customData.action === 'order' && customData.order && customData.slug) {
                                     url = `/${customData.slug}/pedido/${customData.order}`;
                                 }
