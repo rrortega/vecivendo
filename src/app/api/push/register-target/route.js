@@ -37,15 +37,19 @@ export async function POST(request) {
             try {
                 console.log(`[RegisterTarget] Limpiando targets para user: ${uid}`);
                 const response = await users.listTargets({ userId: uid });
+
+                // Eliminar TODOS los targets de tipo push existentes
+                // Esto asegura que no queden tokens expirados después de reinstalar la app
                 for (const t of response.targets) {
                     if (t.providerType === 'push') {
-                        // Eliminamos si es un ID aleatorio o si el token es viejo
-                        if (t.$id !== uid || t.identifier !== token) {
-                            console.log(`[RegisterTarget] Eliminando target obsoleto ${t.$id}`);
+                        console.log(`[RegisterTarget] Eliminando target ${t.$id} (token: ${t.identifier.substring(0, 20)}...)`);
+                        try {
                             await users.deleteTarget({
                                 userId: uid,
                                 targetId: t.$id
                             });
+                        } catch (delError) {
+                            console.warn(`[RegisterTarget] Error eliminando target ${t.$id}:`, delError.message);
                         }
                     }
                 }
