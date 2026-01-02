@@ -6,7 +6,6 @@ import { CartProvider } from "@/context/CartContext";
 import { ConnectionProvider } from "@/context/ConnectionContext";
 import { OfflineNotification } from "@/components/ui/OfflineNotification";
 import { UpdatePrompt } from "@/components/ui/UpdatePrompt";
-import { UpdatePrompt } from "@/components/ui/UpdatePrompt";
 
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });

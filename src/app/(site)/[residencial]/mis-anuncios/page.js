@@ -9,7 +9,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { ShoppingBag, Plus, X, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdAnalytics from "@/components/console/ads/AdAnalytics";
-import { client, account, Databases } from "@/lib/appwrite";
+import { client, account, databases } from "@/lib/appwrite";
 
 export default function MisAnunciosPage({ params }) {
     const { residencial } = params;
@@ -144,7 +144,7 @@ export default function MisAnunciosPage({ params }) {
 
     const handleToggleActive = async (anuncioId, currentStatus) => {
         try {
-            const databases = new Databases(client);
+            // Usar la instancia de databases ya configurada
             const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE || "vecivendo-db";
 
             await databases.updateDocument(dbId, "anuncios", anuncioId, {
