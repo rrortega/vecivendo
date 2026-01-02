@@ -56,9 +56,12 @@ export async function POST(request) {
             tokenPreview: token.substring(0, 30) + '...'
         });
 
-        try {
+        // Función interna para realizar la operación de Appwrite con lógica de reintento
+        const performOperation = async (currentUserId) => {
+            console.log(`[RegisterTarget] Intentando operación para userId: ${currentUserId}`);
+
             // Primero verificamos si ya existe un target con este providerId
-            const existingTargets = await users.listTargets(userId);
+            const existingTargets = await users.listTargets(currentUserId);
             const existingPushTarget = existingTargets.targets.find(
                 target => target.providerType === 'push' && target.providerId === providerId
             );
@@ -67,43 +70,72 @@ export async function POST(request) {
                 // Si ya existe, actualizamos el token (identifier)
                 console.log('[RegisterTarget] Actualizando target existente:', existingPushTarget.$id);
 
-                const updatedTarget = await users.updateTarget(
-                    userId,
+                return await users.updateTarget(
+                    currentUserId,
                     existingPushTarget.$id,
                     token // nuevo identifier (token FCM)
                 );
-
-                return NextResponse.json({
-                    success: true,
-                    action: 'updated',
-                    targetId: updatedTarget.$id,
-                    providerId: updatedTarget.providerId
-                });
             }
 
             // Crear nuevo target
             const targetId = ID.unique();
-            const newTarget = await users.createTarget(
-                userId,
+            return await users.createTarget(
+                currentUserId,
                 targetId,
                 'push',           // providerType
                 token,            // identifier (el token FCM)
                 providerId        // providerId (teléfono + PUSH)
             );
+        };
 
-            console.log('[RegisterTarget] Target creado exitosamente:', newTarget.$id);
+        try {
+            // 1. Intentar con el userId recibido (o el ya normalizado si aplica)
+            const result = await performOperation(userId);
 
             return NextResponse.json({
                 success: true,
-                action: 'created',
-                targetId: newTarget.$id,
-                providerId: newTarget.providerId
+                action: 'completed',
+                targetId: result.$id,
+                providerId: result.providerId
             });
 
         } catch (appwriteError) {
-            console.error('[RegisterTarget] Appwrite error:', appwriteError);
+            // 2. Si el error es "User not found", intentamos con la variante de ID alternativo
+            const isUserNotFoundError = appwriteError.message?.includes('User with the requested ID could not be found') || appwriteError.code === 404;
 
-            // Si es un error de target duplicado, lo manejamos
+            if (isUserNotFoundError) {
+                console.log('[RegisterTarget] Usuario no encontrado, intentando con variante de ID...');
+
+                let altUserId = null;
+                // Si es México y no tiene el 1, intentamos ponérselo
+                if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+                    altUserId = '521' + userId.substring(2);
+                }
+                // Si es México y TIENE el 1, intentamos quitárselo
+                else if (userId.startsWith('521') && userId.length === 13) {
+                    altUserId = '52' + userId.substring(3);
+                }
+
+                if (altUserId && altUserId !== userId) {
+                    try {
+                        console.log(`[RegisterTarget] Reintentando con ID alternativo: ${altUserId}`);
+                        const result = await performOperation(altUserId);
+                        return NextResponse.json({
+                            success: true,
+                            action: 'completed_with_retry',
+                            targetId: result.$id,
+                            providerId: result.providerId,
+                            usedAltId: true
+                        });
+                    } catch (retryError) {
+                        console.error('[RegisterTarget] Error en reintento:', retryError);
+                        // Si falla el reintento, lanzamos el error original o el nuevo
+                        throw retryError;
+                    }
+                }
+            }
+
+            // Si es un error de target duplicado, lo manejamos de forma amigable
             if (appwriteError.code === 409) {
                 return NextResponse.json({
                     success: true,
@@ -146,39 +178,76 @@ export async function DELETE(request) {
             );
         }
 
-        let targetToDelete = targetId;
+        const performDelete = async (currentUserId) => {
+            let actualTargetId = targetId;
 
-        // Si no tenemos targetId pero tenemos phone, buscamos el target
-        if (!targetToDelete && phone) {
-            const cleanPhone = phone.replace(/\D/g, '');
-            const providerId = `${cleanPhone}PUSH`;
+            // Si no tenemos targetId pero tenemos phone, buscamos el target
+            if (!actualTargetId && phone) {
+                const cleanPhone = phone.replace(/\D/g, '');
+                const providerId = `${cleanPhone}PUSH`;
 
-            const targets = await users.listTargets(userId);
-            const pushTarget = targets.targets.find(
-                target => target.providerType === 'push' && target.providerId === providerId
-            );
+                const targets = await users.listTargets(currentUserId);
+                const pushTarget = targets.targets.find(
+                    target => target.providerType === 'push' && target.providerId === providerId
+                );
 
-            if (pushTarget) {
-                targetToDelete = pushTarget.$id;
+                if (pushTarget) {
+                    actualTargetId = pushTarget.$id;
+                }
             }
+
+            if (!actualTargetId) {
+                throw new Error('NOT_FOUND');
+            }
+
+            await users.deleteTarget(currentUserId, actualTargetId);
+            return actualTargetId;
+        };
+
+        try {
+            const deletedId = await performDelete(userId);
+            return NextResponse.json({
+                success: true,
+                action: 'deleted',
+                targetId: deletedId
+            });
+        } catch (error) {
+            const isUserNotFoundError = error.message?.includes('User with the requested ID could not be found') || error.code === 404;
+
+            if (isUserNotFoundError) {
+                console.log('[RegisterTarget] Usuario no encontrado en DELETE, intentando con variante de ID...');
+
+                let altUserId = null;
+                if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+                    altUserId = '521' + userId.substring(2);
+                } else if (userId.startsWith('521') && userId.length === 13) {
+                    altUserId = '52' + userId.substring(3);
+                }
+
+                if (altUserId && altUserId !== userId) {
+                    try {
+                        console.log(`[RegisterTarget] Reintentando DELETE con ID alternativo: ${altUserId}`);
+                        const deletedId = await performDelete(altUserId);
+                        return NextResponse.json({
+                            success: true,
+                            action: 'deleted_with_retry',
+                            targetId: deletedId,
+                            usedAltId: true
+                        });
+                    } catch (retryError) {
+                        if (retryError.message === 'NOT_FOUND') {
+                            return NextResponse.json({ error: 'No se encontró el target' }, { status: 404 });
+                        }
+                        throw retryError;
+                    }
+                }
+            }
+
+            if (error.message === 'NOT_FOUND') {
+                return NextResponse.json({ error: 'No se encontró el target' }, { status: 404 });
+            }
+            throw error;
         }
-
-        if (!targetToDelete) {
-            return NextResponse.json(
-                { error: 'No se encontró el target a eliminar' },
-                { status: 404 }
-            );
-        }
-
-        await users.deleteTarget(userId, targetToDelete);
-
-        console.log('[RegisterTarget] Target eliminado:', targetToDelete);
-
-        return NextResponse.json({
-            success: true,
-            action: 'deleted',
-            targetId: targetToDelete
-        });
 
     } catch (error) {
         console.error('[RegisterTarget] Error al eliminar:', error);

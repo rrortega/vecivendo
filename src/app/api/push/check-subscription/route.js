@@ -43,15 +43,16 @@ export async function GET(request) {
         const cleanPhone = phone ? phone.replace(/\D/g, '') : (userId ? userId : null);
         const expectedProviderId = cleanPhone ? `${cleanPhone}PUSH` : null;
 
+        // Función para buscar suscripción
+        const findPushSubscription = async (currentUserId) => {
+            const targets = await users.listTargets(currentUserId);
+            return targets.targets.find(target => target.providerType === 'push');
+        };
+
         // Si tenemos userId, intentamos buscar los targets del usuario
         if (userId) {
             try {
-                const targets = await users.listTargets(userId);
-
-                // Buscar si existe un target de tipo push
-                const pushTarget = targets.targets.find(target =>
-                    target.providerType === 'push'
-                );
+                let pushTarget = await findPushSubscription(userId);
 
                 if (pushTarget) {
                     return NextResponse.json({
@@ -62,7 +63,35 @@ export async function GET(request) {
                     });
                 }
             } catch (error) {
-                console.log('[CheckSubscription] Error listing targets:', error.message);
+                const isUserNotFoundError = error.message?.includes('User with the requested ID could not be found') || error.code === 404;
+                if (isUserNotFoundError) {
+                    console.log('[CheckSubscription] Usuario no encontrado, probando variante...');
+
+                    let altUserId = null;
+                    if (userId.startsWith('52') && userId.length === 12 && !userId.startsWith('521')) {
+                        altUserId = '521' + userId.substring(2);
+                    } else if (userId.startsWith('521') && userId.length === 13) {
+                        altUserId = '52' + userId.substring(3);
+                    }
+
+                    if (altUserId && altUserId !== userId) {
+                        try {
+                            const pushTarget = await findPushSubscription(altUserId);
+                            if (pushTarget) {
+                                return NextResponse.json({
+                                    isSubscribed: true,
+                                    targetId: pushTarget.$id,
+                                    providerId: pushTarget.providerId,
+                                    identifier: pushTarget.identifier,
+                                    usedAltId: true
+                                });
+                            }
+                        } catch (retryError) {
+                            console.log('[CheckSubscription] Error en reintento de verificación');
+                        }
+                    }
+                }
+                console.log('[CheckSubscription] Error final listing targets:', error.message);
             }
         }
 
